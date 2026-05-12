@@ -1,9 +1,16 @@
-import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
 import { AppShell } from "@/components/layout/app-shell";
-import type { Role } from "@/types";
+import { getCurrentUser } from "@/lib/data";
+
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
-  const cookieStore = await cookies();
-  const role = (cookieStore.get("role")?.value ?? "externo") as Role;
+  const profile = await getCurrentUser();
+  if (!profile) redirect("/login");
+
+  const role: "interno" | "externo" =
+    profile.user_type === "interno" || profile.is_super_admin ? "interno" : "externo";
+
   return <AppShell role={role}>{children}</AppShell>;
 }
