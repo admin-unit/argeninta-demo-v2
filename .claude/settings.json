@@ -1,0 +1,15 @@
+{
+  "hooks": {
+    "Stop": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/home/kenpias/unit/argeninta/demo/.claude/scripts/on-stop.sh"
+          }
+        ]
+      }
+    ]
+  }
+}
