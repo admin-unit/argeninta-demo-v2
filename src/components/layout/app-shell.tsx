@@ -2,8 +2,9 @@
 
 import { useState, useEffect } from "react";
 import { Sidebar } from "./sidebar";
+import type { Role } from "@/types";
 
-export function AppShell({ children }: { children: React.ReactNode }) {
+export function AppShell({ children, role }: { children: React.ReactNode; role: Role }) {
   const [collapsed, setCollapsed] = useState(false);
 
   useEffect(() => {
@@ -20,7 +21,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex h-screen overflow-hidden bg-background">
-      <Sidebar collapsed={collapsed} onToggle={toggle} />
+      <Sidebar collapsed={collapsed} onToggle={toggle} role={role} />
       <main className="flex-1 overflow-y-auto min-w-0">{children}</main>
     </div>
   );
