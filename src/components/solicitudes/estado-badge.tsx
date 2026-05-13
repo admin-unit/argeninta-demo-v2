@@ -1,19 +1,22 @@
 import { Badge } from '@/components/ui/badge'
-import type { EstadoSolicitud } from '@/types'
+import { ESTADO_LABEL, type EstadoSolicitud } from '@/types'
 import { cn } from '@/lib/utils'
 
-const CONFIG: Record<EstadoSolicitud, { label: string; className: string }> = {
-  borrador:     { label: 'Borrador',      className: 'bg-gray-100 text-gray-600 border-gray-200' },
-  pendiente:    { label: 'Pendiente',     className: 'bg-amber-50 text-amber-700 border-amber-200' },
-  en_gestion:   { label: 'En gestión',    className: 'bg-blue-50 text-blue-700 border-blue-200' },
-  en_tesoreria: { label: 'En tesorería',  className: 'bg-violet-50 text-violet-700 border-violet-200' },
-  pagado:       { label: 'Pagado',        className: 'bg-green-50 text-green-700 border-green-200' },
-  archivado:    { label: 'Archivado',     className: 'bg-gray-100 text-gray-500 border-gray-200' },
-  rechazado:    { label: 'Rechazado',     className: 'bg-red-50 text-red-700 border-red-200' },
+const CLASSES: Record<EstadoSolicitud, string> = {
+  draft:          'bg-gray-100 text-gray-600 border-gray-200',
+  submitted:      'bg-amber-50 text-amber-700 border-amber-200',
+  in_review:      'bg-orange-50 text-orange-700 border-orange-200',
+  in_progress:    'bg-blue-50 text-blue-700 border-blue-200',
+  posted_to_odoo: 'bg-violet-50 text-violet-700 border-violet-200',
+  in_payment:     'bg-cyan-50 text-cyan-700 border-cyan-200',
+  closed:         'bg-green-50 text-green-700 border-green-200',
+  cancelled:      'bg-rose-50 text-rose-700 border-rose-200',
+  error:          'bg-red-100 text-red-800 border-red-300',
 }
 
 export function EstadoBadge({ estado }: { estado: EstadoSolicitud }) {
-  const { label, className } = CONFIG[estado]
+  const className = CLASSES[estado] ?? CLASSES.draft
+  const label = ESTADO_LABEL[estado] ?? estado
   return (
     <Badge variant="outline" className={cn('font-medium text-xs', className)}>
       {label}

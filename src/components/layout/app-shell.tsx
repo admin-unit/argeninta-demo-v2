@@ -1,10 +1,17 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Sidebar } from "./sidebar";
+import { Sidebar, type SidebarUser } from "./sidebar";
 import type { Role } from "@/types";
 
-export function AppShell({ children, role }: { children: React.ReactNode; role: Role }) {
+interface AppShellProps {
+  children: React.ReactNode;
+  role: Role;
+  user: SidebarUser;
+  isSuperAdmin: boolean;
+}
+
+export function AppShell({ children, role, user, isSuperAdmin }: AppShellProps) {
   const [collapsed, setCollapsed] = useState(false);
 
   useEffect(() => {
@@ -21,7 +28,13 @@ export function AppShell({ children, role }: { children: React.ReactNode; role: 
 
   return (
     <div className="flex h-screen overflow-hidden bg-background">
-      <Sidebar collapsed={collapsed} onToggle={toggle} role={role} />
+      <Sidebar
+        collapsed={collapsed}
+        onToggle={toggle}
+        role={role}
+        user={user}
+        isSuperAdmin={isSuperAdmin}
+      />
       <main className="flex-1 overflow-y-auto min-w-0">{children}</main>
     </div>
   );

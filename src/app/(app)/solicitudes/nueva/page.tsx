@@ -14,7 +14,7 @@ const TIPOS: { key: TipoGestion; label: string; desc: string; icon: React.ReactN
     ),
   },
   {
-    key: 'solicitud_compra',
+    key: 'compra',
     label: 'Solicitud de compra',
     desc: 'Necesitás comprar bienes o contratar un servicio con fondos del proyecto',
     icon: (
@@ -24,22 +24,12 @@ const TIPOS: { key: TipoGestion; label: string; desc: string; icon: React.ReactN
     ),
   },
   {
-    key: 'anticipo',
-    label: 'Anticipo de fondos',
+    key: 'anticipo_rendicion',
+    label: 'Anticipo y Rendición',
     desc: 'Necesitás fondos por adelantado para gastos que vas a rendir después',
     icon: (
       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-      </svg>
-    ),
-  },
-  {
-    key: 'rendicion',
-    label: 'Rendición de cuentas',
-    desc: 'Tenés un anticipo previo y querés presentar los comprobantes de los gastos',
-    icon: (
-      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
       </svg>
     ),
   },
@@ -175,12 +165,10 @@ export default async function NuevaSolicitud({
                     placeholder={
                       tipoSeleccionado.key === 'pago_factura'
                         ? 'Ej: Análisis de suelos — LabSuelos S.A.'
-                        : tipoSeleccionado.key === 'anticipo'
+                        : tipoSeleccionado.key === 'anticipo_rendicion'
                         ? 'Ej: Anticipo viaje técnico — jornadas San Juan'
                         : tipoSeleccionado.key === 'contrato'
                         ? 'Ej: Consultoría estadística temporal — Dr. García'
-                        : tipoSeleccionado.key === 'rendicion'
-                        ? 'Ej: Rendición anticipo viaje San Juan — marzo 2026'
                         : tipoSeleccionado.key === 'reintegro'
                         ? 'Ej: Reintegro materiales de laboratorio comprados en campo'
                         : 'Descripción breve de la solicitud'
@@ -224,7 +212,7 @@ export default async function NuevaSolicitud({
                   <label className="block text-xs font-medium text-muted-foreground mb-1.5">
                     {tipoSeleccionado.key === 'contrato'
                       ? 'Nombre del contratado'
-                      : tipoSeleccionado.key === 'anticipo' || tipoSeleccionado.key === 'rendicion' || tipoSeleccionado.key === 'reintegro'
+                      : tipoSeleccionado.key === 'anticipo_rendicion' || tipoSeleccionado.key === 'reintegro'
                       ? 'Tu nombre completo (quien recibe el pago)'
                       : 'Proveedor / Razón social'}
                     {' '}<span className="text-destructive">*</span>
@@ -236,7 +224,7 @@ export default async function NuevaSolicitud({
                   />
                 </div>
 
-                {(tipoSeleccionado.key === 'pago_factura' || tipoSeleccionado.key === 'solicitud_compra') && (
+                {(tipoSeleccionado.key === 'pago_factura' || tipoSeleccionado.key === 'compra') && (
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <label className="block text-xs font-medium text-muted-foreground mb-1.5">N° de factura / comprobante</label>
@@ -283,8 +271,6 @@ export default async function NuevaSolicitud({
               <p className="text-xs text-muted-foreground mb-3">
                 {tipoSeleccionado.key === 'pago_factura'
                   ? 'Adjuntá la factura PDF y la nota de autorización del responsable del organismo.'
-                  : tipoSeleccionado.key === 'rendicion'
-                  ? 'Adjuntá todos los comprobantes de los gastos realizados (tickets, facturas, recibos).'
                   : tipoSeleccionado.key === 'reintegro'
                   ? 'Adjuntá los comprobantes de los gastos que querés que te reintegren.'
                   : 'Adjuntá la documentación de respaldo de la solicitud.'}

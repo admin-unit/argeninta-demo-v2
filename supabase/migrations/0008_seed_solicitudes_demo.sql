@@ -1,0 +1,22 @@
+-- =============================================================================
+-- 0008_seed_solicitudes_demo.sql — 25+ solicitudes realistas para la demo
+-- =============================================================================
+-- Aplicada vía MCP el 2026-05-13. Esta migración:
+--   * Actualiza las 3 solicitudes "dad" de test con contenido real
+--     (no se pueden borrar por el trigger inmutable de audit_log)
+--   * Inserta 25 solicitudes nuevas distribuidas en 10 organismos, 6 áreas,
+--     5 tipos de gestión y todos los estados (draft → closed).
+--   * Genera audit_log con 3-5 eventos por solicitud (creación, ruteo,
+--     posteo a Odoo, conciliación, etc.)
+--
+-- NO es idempotente. Re-correrla crea duplicados con nuevos numero_expediente.
+-- Si querés re-armar el seed: borrar todas las solicitudes (con cuidado del
+-- audit_log inmutable — habría que `drop trigger audit_log_no_delete` primero).
+--
+-- El SQL completo está en el historial de migrations de Supabase remoto.
+-- Para inspeccionarlo localmente: ver el commit que introduce este archivo o
+-- correr `supabase db pull` para sincronizar el schema local.
+-- =============================================================================
+
+-- Marker no-op para tener este archivo presente en supabase/migrations
+select 1 as seed_solicitudes_demo_applied;

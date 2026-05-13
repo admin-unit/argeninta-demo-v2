@@ -1,4 +1,4 @@
-import type { Solicitud, CuentaAnalitica, Organismo, Expediente, Convenio, Mail, UsuarioInterno } from '@/types'
+import type { CuentaAnalitica, Organismo, Expediente, Convenio, Mail, UsuarioInterno } from '@/types'
 
 export const CUENTAS_ANALITICAS: CuentaAnalitica[] = [
   { id: '1', codigo: 'INTA-2025-001', nombre: 'Mejoramiento genético bovino', organismo: 'INTA', saldo_total: 12500000, saldo_disponible: 8340000, moneda: 'ARS' },
@@ -17,104 +17,6 @@ export const ORGANISMOS: Organismo[] = [
   { id: '5', nombre: 'BID',    codigo: 'BID',    tipo: 'internacional',  referente: 'Pierre Moreau',    email: 'pmoreau@iadb.org' },
 ]
 
-export const SOLICITUDES: Solicitud[] = [
-  {
-    id: '1', nro: 'EXP-2026-0047', tipo: 'pago_factura', bandeja: 'nacional',
-    estado: 'en_tesoreria', concepto: 'Análisis de suelos laboratorio regional Córdoba',
-    importe: 148500, moneda: 'ARS', organismo: 'INTA', cuenta_analitica: 'INTA-2025-002',
-    beneficiario: 'LabSuelos S.A.', solicitante: 'Ing. Pedro Blanco', responsable_area: 'René Castro',
-    fecha_solicitud: '2026-05-08', fecha_actualizacion: '2026-05-09', odoo_id: 1084, expediente_id: 'exp-1',
-    historial: [
-      { id: 'h1', fecha: '2026-05-08 09:14', usuario: 'Pedro Blanco', area: 'INTA', accion: 'Solicitud creada', nota: 'Factura adjunta' },
-      { id: 'h2', fecha: '2026-05-08 10:30', usuario: 'René Castro', area: 'Administración', accion: 'Recibido en mesa de entrada', nota: 'Derivado a administración' },
-      { id: 'h3', fecha: '2026-05-09 08:45', usuario: 'René Castro', area: 'Administración', accion: 'Expediente iniciado — FA-2026-00124', nota: 'Factura registrada en Odoo #1084' },
-      { id: 'h4', fecha: '2026-05-09 11:20', usuario: 'Sistema', area: 'Administración', accion: 'Derivado a Tesorería', nota: 'Asignado a Ramiro Flores' },
-    ],
-  },
-  {
-    id: '2', nro: 'EXP-2026-0046', tipo: 'anticipo', bandeja: 'nacional',
-    estado: 'en_gestion', concepto: 'Anticipo viaje técnico jornadas fitosanitarias Mendoza',
-    importe: 85000, moneda: 'ARS', organismo: 'SENASA', cuenta_analitica: 'SENASA-2025-001',
-    beneficiario: 'Laura Gómez', solicitante: 'Laura Gómez', responsable_area: 'René Castro',
-    fecha_solicitud: '2026-05-07', fecha_actualizacion: '2026-05-08', expediente_id: 'exp-2',
-    historial: [
-      { id: 'h1', fecha: '2026-05-07 14:00', usuario: 'Laura Gómez', area: 'SENASA', accion: 'Solicitud creada' },
-      { id: 'h2', fecha: '2026-05-08 09:00', usuario: 'René Castro', area: 'Administración', accion: 'Recibido en mesa de entrada' },
-      { id: 'h3', fecha: '2026-05-08 11:00', usuario: 'René Castro', area: 'Administración', accion: 'En revisión — solicitando documentación adicional', nota: 'Falta nota de autorización' },
-    ],
-  },
-  {
-    id: '3', nro: 'EXP-2026-0045', tipo: 'contrato', bandeja: 'nacional',
-    estado: 'pendiente', concepto: 'Contrato consultoría especialista suelos Alejandro Vera',
-    importe: 320000, moneda: 'ARS', organismo: 'INTA', cuenta_analitica: 'INTA-2025-001',
-    beneficiario: 'Alejandro Vera', solicitante: 'Ing. Sofía Mendez', responsable_area: 'René Castro',
-    fecha_solicitud: '2026-05-06', fecha_actualizacion: '2026-05-06',
-    historial: [
-      { id: 'h1', fecha: '2026-05-06 10:30', usuario: 'Sofía Mendez', area: 'INTA', accion: 'Solicitud creada', nota: 'Contrato a 3 meses, modalidad RRHH' },
-      { id: 'h2', fecha: '2026-05-06 13:00', usuario: 'René Castro', area: 'Administración', accion: 'Recibido en mesa de entrada' },
-    ],
-  },
-  {
-    id: '4', nro: 'EXP-2026-0044', tipo: 'rendicion', bandeja: 'nacional',
-    estado: 'pagado', concepto: 'Rendición anticipo jornada técnica San Juan marzo 2026',
-    importe: 62400, moneda: 'ARS', organismo: 'INA', cuenta_analitica: 'INA-2025-001',
-    beneficiario: 'Carlos Ríos', solicitante: 'Carlos Ríos', responsable_area: 'René Castro',
-    fecha_solicitud: '2026-04-20', fecha_actualizacion: '2026-05-02', odoo_id: 1071, expediente_id: 'exp-4',
-    historial: [
-      { id: 'h1', fecha: '2026-04-20 09:00', usuario: 'Carlos Ríos', area: 'INA', accion: 'Rendición presentada' },
-      { id: 'h2', fecha: '2026-04-21 10:00', usuario: 'René Castro', area: 'Administración', accion: 'Documentación verificada' },
-      { id: 'h3', fecha: '2026-04-22 14:30', usuario: 'René Castro', area: 'Administración', accion: 'Cargado en Odoo', nota: 'Odoo #1071' },
-      { id: 'h4', fecha: '2026-04-23 11:00', usuario: 'Ramiro Flores', area: 'Tesorería', accion: 'Pago procesado' },
-      { id: 'h5', fecha: '2026-05-02 09:00', usuario: 'Sistema', area: 'Sistema', accion: 'Conciliación confirmada — expediente cerrado' },
-    ],
-  },
-  {
-    id: '5', nro: 'EXP-2026-0043', tipo: 'solicitud_compra', bandeja: 'nacional',
-    estado: 'rechazado', concepto: 'Compra reactivos laboratorio CABA — sin proveedor homologado',
-    importe: 95000, moneda: 'ARS', organismo: 'SENASA', cuenta_analitica: 'SENASA-2025-001',
-    beneficiario: 'LabReactivos del Norte SRL', solicitante: 'Lucas Pereyra',
-    fecha_solicitud: '2026-04-18', fecha_actualizacion: '2026-04-19',
-    historial: [
-      { id: 'h1', fecha: '2026-04-18 16:00', usuario: 'Lucas Pereyra', area: 'SENASA', accion: 'Solicitud creada' },
-      { id: 'h2', fecha: '2026-04-19 09:30', usuario: 'René Castro', area: 'Administración', accion: 'Rechazado — proveedor no homologado', nota: 'Debe tramitar alta de proveedor primero' },
-    ],
-  },
-  {
-    id: '6', nro: 'EXP-2026-I-012', tipo: 'pago_factura', bandeja: 'internacional',
-    estado: 'en_gestion', concepto: 'Honorarios consultor IICA — Tiago Méndez — abril 2026',
-    importe: 4500, moneda: 'USD', organismo: 'IICA', cuenta_analitica: 'INTL-2025-001',
-    beneficiario: 'Tiago Méndez', solicitante: 'Ana Soto', responsable_area: 'Cata Ramírez',
-    fecha_solicitud: '2026-05-05', fecha_actualizacion: '2026-05-07', expediente_id: 'exp-6',
-    historial: [
-      { id: 'h1', fecha: '2026-05-05 11:00', usuario: 'Ana Soto', area: 'IICA', accion: 'Solicitud creada', nota: 'Factura en USD adjunta' },
-      { id: 'h2', fecha: '2026-05-06 09:30', usuario: 'Cata Ramírez', area: 'Internacional', accion: 'Control previo iniciado', nota: 'Verificando gastos permitidos por proyecto' },
-      { id: 'h3', fecha: '2026-05-07 10:00', usuario: 'Cata Ramírez', area: 'Internacional', accion: 'Control aprobado — derivado a administración' },
-    ],
-  },
-  {
-    id: '7', nro: 'EXP-2026-I-011', tipo: 'anticipo', bandeja: 'internacional',
-    estado: 'pendiente', concepto: 'Anticipo pasajes y viáticos reunión BID — Washington DC — junio 2026',
-    importe: 3200, moneda: 'USD', organismo: 'BID', cuenta_analitica: 'INTL-2025-002',
-    beneficiario: 'Ernesto Villarreal', solicitante: 'Pierre Moreau', responsable_area: 'Cata Ramírez',
-    fecha_solicitud: '2026-05-09', fecha_actualizacion: '2026-05-09',
-    historial: [
-      { id: 'h1', fecha: '2026-05-09 14:00', usuario: 'Pierre Moreau', area: 'BID', accion: 'Solicitud creada', nota: 'Reunión técnica 15-17 junio 2026' },
-    ],
-  },
-  {
-    id: '8', nro: 'EXP-2026-I-010', tipo: 'reintegro', bandeja: 'internacional',
-    estado: 'pagado', concepto: 'Reintegro gastos misión técnica IICA — Buenos Aires — marzo 2026',
-    importe: 1800, moneda: 'USD', organismo: 'IICA', cuenta_analitica: 'INTL-2025-001',
-    beneficiario: 'Ana Soto', solicitante: 'Ana Soto', responsable_area: 'Cata Ramírez',
-    fecha_solicitud: '2026-04-10', fecha_actualizacion: '2026-04-28', odoo_id: 1065, expediente_id: 'exp-8',
-    historial: [
-      { id: 'h1', fecha: '2026-04-10 09:00', usuario: 'Ana Soto', area: 'IICA', accion: 'Reintegro presentado' },
-      { id: 'h2', fecha: '2026-04-11 10:00', usuario: 'Cata Ramírez', area: 'Internacional', accion: 'Control previo completado' },
-      { id: 'h3', fecha: '2026-04-14 09:00', usuario: 'René Castro', area: 'Administración', accion: 'Cargado en Odoo', nota: 'Odoo #1065' },
-      { id: 'h4', fecha: '2026-04-28 15:00', usuario: 'Sistema', area: 'Sistema', accion: 'Pago conciliado — expediente cerrado' },
-    ],
-  },
-]
 
 export const CONVENIOS: Convenio[] = [
   { id: 'c1', codigo: 'CONV-INTA-2025-001', nombre: 'Mejoramiento genético bovino', organismo: 'INTA', estado: 'vigente', inicio: '2025-01-01', vencimiento: '2025-12-31', monto: 12500000, moneda: 'ARS' },
