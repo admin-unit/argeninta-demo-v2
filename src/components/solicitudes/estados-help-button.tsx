@@ -59,13 +59,31 @@ const ESTADOS_ALT = [
     key: "cancelled",
     label: "Cancelado",
     color: "bg-slate-100 text-slate-600 border-slate-200",
-    desc: "La solicitud se canceló (por el solicitante o por Argeninta) y no continúa el flujo.",
+    desc: "Se llega con el botón \"Cancelar expediente\" desde cualquier estado activo. Queda la razón registrada en la trazabilidad.",
   },
   {
     key: "error",
     label: "Error",
     color: "bg-rose-50 text-rose-700 border-rose-200",
     desc: "Hubo un problema bloqueante. Mirá la trazabilidad para ver qué pasó y reabrir si corresponde.",
+  },
+];
+
+const ACCIONES_ESCAPE = [
+  {
+    label: "Deshacer último paso",
+    icon: "↶",
+    desc: "Si avanzaste el estado sin querer, te volvés al estado y área anteriores. Aparece solo si ya hubo al menos un cambio de estado en este expediente.",
+  },
+  {
+    label: "Derivar manualmente a otra área",
+    icon: "→",
+    desc: "El expediente cambia de área sin cambiar de estado. Sirve para mandarlo a Jurídicos, Capital Humano u otra área fuera del flujo normal. Podés agregar un motivo.",
+  },
+  {
+    label: "Cancelar expediente",
+    icon: "✕",
+    desc: "Manda el expediente al estado \"Cancelado\" desde cualquier punto del flujo. Requiere indicar una razón.",
   },
 ];
 
@@ -161,6 +179,28 @@ export function EstadosHelpButton({ titulo = "Progreso de estados" }: { titulo?:
                     <p className="text-[12.5px] text-muted-foreground leading-relaxed">
                       {e.desc}
                     </p>
+                  </div>
+                ))}
+              </div>
+
+              <h3 className="text-[11px] font-semibold text-muted-foreground uppercase tracking-widest mt-6 mb-3">
+                Acciones de escape
+              </h3>
+              <p className="text-[12px] text-muted-foreground mb-3 leading-relaxed">
+                Dentro de cada expediente, además del botón principal para avanzar, tenés estas opciones para corregir o desviar el flujo:
+              </p>
+              <div className="space-y-2">
+                {ACCIONES_ESCAPE.map((a) => (
+                  <div key={a.label} className="flex items-start gap-3 p-3 rounded-lg border border-border bg-card">
+                    <span className="w-6 h-6 flex items-center justify-center rounded-full bg-muted border border-border text-foreground text-[13px] flex-shrink-0 font-semibold">
+                      {a.icon}
+                    </span>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[12.5px] font-semibold text-foreground">{a.label}</p>
+                      <p className="text-[12px] text-muted-foreground leading-relaxed mt-0.5">
+                        {a.desc}
+                      </p>
+                    </div>
                   </div>
                 ))}
               </div>
