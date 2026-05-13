@@ -5,6 +5,7 @@
  * y Server Actions. Reemplaza progresivamente a mock-data.ts.
  */
 
+import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 
@@ -39,7 +40,8 @@ export const AREAS_INTERNACIONAL = [AREA_IDS.INTERNACIONAL];
 // USUARIO ACTUAL Y PERFIL
 // =============================================================================
 
-export async function getCurrentUser() {
+// Deduplicado por request: layout + page + actions del mismo SSR comparten el resultado.
+export const getCurrentUser = cache(async () => {
   const supabase = await createClient();
   const {
     data: { user },
@@ -53,7 +55,7 @@ export async function getCurrentUser() {
     .maybeSingle();
 
   return profile;
-}
+});
 
 export async function getCurrentUserOrThrow() {
   const profile = await getCurrentUser();
@@ -205,25 +207,22 @@ export interface ProfileContext {
   } | null;
 }
 
-export async function getCurrentProfileWithContext(): Promise<ProfileContext> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return { profile: null, primary_organism: null, primary_area: null };
+export const getCurrentProfileWithContext = cache(async (): Promise<ProfileContext> => {
+  const profile = await getCurrentUser();
+  if (!profile) return { profile: null, primary_organism: null, primary_area: null };
 
-  const [{ data: profile }, { data: orgMem }, { data: areaMem }] = await Promise.all([
-    supabase.from("profiles").select("*").eq("id", user.id).maybeSingle(),
+  const supabase = await createClient();
+  const [{ data: orgMem }, { data: areaMem }] = await Promise.all([
     supabase
       .from("organism_members")
       .select("role, organism:organisms(id, name, short_name)")
-      .eq("user_id", user.id)
+      .eq("user_id", profile.id)
       .limit(1)
       .maybeSingle(),
     supabase
       .from("internal_area_members")
       .select("role, is_primary, area:internal_areas(id, name)")
-      .eq("user_id", user.id)
+      .eq("user_id", profile.id)
       .order("is_primary", { ascending: false })
       .limit(1)
       .maybeSingle(),
@@ -243,7 +242,7 @@ export async function getCurrentProfileWithContext(): Promise<ProfileContext> {
       ? { ...area, role: (areaMem?.role as string) ?? "miembro" }
       : null,
   };
-}
+});
 
 export async function getSolicitudById(id: string) {
   const supabase = await createClient();
