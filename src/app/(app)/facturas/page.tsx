@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { getSolicitudes } from "@/lib/data";
 import { EstadoBadge } from "@/components/solicitudes/estado-badge";
+import { EstadosHelpButton } from "@/components/solicitudes/estados-help-button";
 import { TIPO_LABEL, type EstadoSolicitud, type TipoGestion } from "@/types";
 
 export const dynamic = "force-dynamic";
@@ -25,7 +26,10 @@ export default async function Facturas() {
   return (
     <div className="p-6">
       <div className="mb-6">
-        <h1 className="text-xl font-semibold text-foreground">Facturas</h1>
+        <div className="flex items-center gap-2">
+          <h1 className="text-xl font-semibold text-foreground">Facturas</h1>
+          <EstadosHelpButton titulo="Progreso de estados de una factura" />
+        </div>
         <p className="text-sm text-muted-foreground mt-0.5">
           {facturas.length} facturas de proveedor (tipo Pago de factura)
         </p>

@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { getAllOrganisms, getSolicitudCountByOrganism } from "@/lib/data";
 
 export const dynamic = "force-dynamic";
@@ -42,6 +43,7 @@ export default async function Organismos() {
               <th className="text-right px-4 py-3 text-[10.5px] font-semibold text-muted-foreground uppercase tracking-wider">
                 Total
               </th>
+              <th className="px-4 py-3" />
             </tr>
           </thead>
           <tbody className="divide-y divide-border/50">
@@ -95,6 +97,17 @@ export default async function Organismos() {
                   </td>
                   <td className="px-4 py-3 text-right text-muted-foreground tabular-nums">
                     {c.total || "—"}
+                  </td>
+                  <td className="px-4 py-3 text-right">
+                    <Link
+                      href={`/solicitudes/nueva?organism_id=${org.id}&organism_name=${encodeURIComponent(org.short_name ?? org.name)}&bandeja=${isInternacional ? "internacional" : "nacional"}`}
+                      className="inline-flex items-center gap-1 text-[11.5px] font-medium text-primary hover:bg-primary/[0.06] px-2 py-1 rounded-md transition-colors whitespace-nowrap"
+                    >
+                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.25} d="M12 4v16m8-8H4" />
+                      </svg>
+                      Nueva solicitud
+                    </Link>
                   </td>
                 </tr>
               );

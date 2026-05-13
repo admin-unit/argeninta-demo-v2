@@ -60,9 +60,9 @@ const MONEDAS = ['ARS', 'USD', 'EUR']
 export default async function NuevaSolicitud({
   searchParams,
 }: {
-  searchParams: Promise<{ tipo?: string; bandeja?: string }>
+  searchParams: Promise<{ tipo?: string; bandeja?: string; organism_id?: string; organism_name?: string }>
 }) {
-  const { tipo: tipoParam, bandeja = 'nacional' } = await searchParams
+  const { tipo: tipoParam, bandeja = 'nacional', organism_name: organismName } = await searchParams
   const tipoSeleccionado = TIPOS.find(t => t.key === tipoParam)
 
   const cuentasFiltradas = CUENTAS_ANALITICAS.filter(c =>
@@ -73,7 +73,7 @@ export default async function NuevaSolicitud({
     <div className="p-6 max-w-2xl mx-auto">
       {/* Header */}
       <div className="mb-8">
-        <div className="flex items-center gap-2 text-sm text-muted-foreground mb-4">
+        <div className="flex items-center gap-2 text-sm text-muted-foreground mb-4 flex-wrap">
           <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${
             bandeja === 'internacional'
               ? 'bg-violet-50 text-violet-700 border border-violet-200'
@@ -82,6 +82,14 @@ export default async function NuevaSolicitud({
             <span className={`w-1.5 h-1.5 rounded-full ${bandeja === 'internacional' ? 'bg-violet-500' : 'bg-primary'}`} />
             Bandeja {bandeja === 'nacional' ? 'Nacional' : 'Internacional'}
           </span>
+          {organismName && (
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
+              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.25} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0H5m14 0h2m-2 0H7m0 0H5m2 0v-4m0 4h10m-10 0v-4m10 4v-4M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 8v-4a1 1 0 011-1h2a1 1 0 011 1v4" />
+              </svg>
+              Para: {organismName}
+            </span>
+          )}
         </div>
         <h1 className="text-2xl font-semibold text-foreground tracking-tight">
           {tipoSeleccionado ? tipoSeleccionado.label : '¿Qué necesitás gestionar?'}
@@ -99,7 +107,7 @@ export default async function NuevaSolicitud({
           {TIPOS.map(t => (
             <a
               key={t.key}
-              href={`/solicitudes/nueva?tipo=${t.key}&bandeja=${bandeja}`}
+              href={`/solicitudes/nueva?tipo=${t.key}&bandeja=${bandeja}${organismName ? `&organism_name=${encodeURIComponent(organismName)}` : ''}`}
               className="group flex items-center gap-4 bg-card border border-border rounded-xl px-5 py-4 hover:border-primary/30 hover:bg-primary/[0.02] transition-all"
             >
               <div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center flex-shrink-0 text-muted-foreground group-hover:bg-primary/10 group-hover:text-primary transition-colors">
