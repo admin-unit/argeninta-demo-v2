@@ -227,8 +227,11 @@ export function Sidebar({ collapsed, onToggle, role, user, isSuperAdmin }: Sideb
           </button>
         ) : (
           <div className="space-y-0.5">
-            <div className="flex items-center gap-2.5 px-2.5 py-2 rounded-md">
-              <div className="w-7 h-7 rounded-full bg-primary/20 flex items-center justify-center shrink-0">
+            <Link
+              href="/perfil"
+              className="flex items-center gap-2.5 px-2.5 py-2 rounded-md hover:bg-sidebar-accent/60 transition-colors group"
+            >
+              <div className="w-7 h-7 rounded-full bg-primary/20 flex items-center justify-center shrink-0 group-hover:bg-primary/30 transition-colors">
                 <span className="text-primary text-xs font-bold">{user.initials}</span>
               </div>
               <div className="min-w-0 flex-1">
@@ -249,7 +252,7 @@ export function Sidebar({ collapsed, onToggle, role, user, isSuperAdmin }: Sideb
                   {user.subtitle}
                 </div>
               </div>
-            </div>
+            </Link>
             <button
               onClick={handleSignOut}
               className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-md text-[13px] font-medium text-sidebar-foreground hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground transition-colors duration-100"

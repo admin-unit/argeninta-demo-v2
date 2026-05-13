@@ -291,6 +291,19 @@ export async function getAreaMembers(areaId: string) {
   return data || [];
 }
 
+/**
+ * Devuelve las áreas en las que el user es miembro, con su rol en cada una.
+ * Útil para la pantalla de perfil — saber qué áreas administra.
+ */
+export async function getMyAreaMemberships(userId: string) {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("internal_area_members")
+    .select("role, is_primary, area:internal_areas(id, name, parent_id)")
+    .eq("user_id", userId);
+  return data || [];
+}
+
 // =============================================================================
 // ORGANISMOS (catálogo)
 // =============================================================================

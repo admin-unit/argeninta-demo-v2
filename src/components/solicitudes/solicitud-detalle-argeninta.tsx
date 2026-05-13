@@ -123,6 +123,29 @@ export function SolicitudDetalleArgeninta({
   const [confirming, setConfirming] = useState(false);
   const [nota, setNota] = useState("");
   const [showNota, setShowNota] = useState(false);
+  const [expandedEventId, setExpandedEventId] = useState<number | null>(null);
+
+  function buildMailtoForEvent(
+    targetEmail: string,
+    targetName: string | null,
+    evento: HistorialEvent,
+  ): string {
+    const greeting = `Hola ${targetName?.trim().split(/\s+/)[0] || ""}`.trim();
+    const expediente = solicitud.numero_expediente ?? "(sin nro)";
+    const concepto = solicitud.concepto ?? "—";
+    const accion = eventoLabel(evento);
+    const fecha = formatFechaHora(evento.created_at);
+
+    const subject = `Consulta — expediente ${expediente}`;
+    const body =
+      `${greeting},\n\n` +
+      `Te escribo por el expediente ${expediente} ("${concepto}").\n\n` +
+      `Veo en la trazabilidad que el ${fecha} intervinieste con: "${accion}".\n\n` +
+      `¿Podrías darme más contexto sobre este punto?\n\n` +
+      `Gracias.`;
+
+    return `mailto:${targetEmail}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+  }
 
   const transition = TRANSITIONS[estado];
   const historialDesc = [...historialLocal].reverse();
@@ -304,53 +327,110 @@ export function SolicitudDetalleArgeninta({
             ) : (
               <div className="relative">
                 <div className="absolute left-3 top-4 bottom-2 w-px bg-border" />
-                <div className="space-y-5">
+                <div className="space-y-3">
                   {historialDesc.map((ev, idx) => {
                     const userName = ev.user?.full_name || ev.user?.email || "Sistema";
+                    const isExpanded = expandedEventId === ev.id;
+                    const hasUserEmail = !!ev.user?.email;
+                    const otherMetadata = ev.metadata
+                      ? Object.entries(ev.metadata).filter(([k]) => k !== "note")
+                      : [];
                     return (
-                      <div key={ev.id} className="flex gap-4 relative">
-                        <div
+                      <div key={ev.id} className="relative">
+                        <button
+                          onClick={() => setExpandedEventId(isExpanded ? null : ev.id)}
                           className={cn(
-                            "w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 z-10 text-[10px] font-bold ring-2 ring-background",
-                            idx === 0
-                              ? "bg-primary text-primary-foreground"
-                              : "bg-muted border border-border text-muted-foreground"
+                            "w-full flex gap-4 relative text-left rounded-lg px-2 -ml-2 py-2 transition-colors",
+                            isExpanded ? "bg-muted/40" : "hover:bg-muted/30",
                           )}
                         >
-                          {idx === 0 ? (
-                            <svg
-                              className="w-3 h-3"
-                              fill="none"
-                              stroke="currentColor"
-                              viewBox="0 0 24 24"
-                            >
-                              <circle
-                                cx="12"
-                                cy="12"
-                                r="3"
-                                strokeWidth={2.5}
-                                fill="currentColor"
-                              />
-                            </svg>
-                          ) : (
-                            userInitials(ev.user?.full_name, ev.user?.email)
-                          )}
-                        </div>
-                        <div className="flex-1 pt-0.5 pb-1">
-                          <p className="text-[13.5px] font-semibold text-foreground leading-snug">
-                            {eventoLabel(ev)}
-                          </p>
-                          <p className="text-[12px] text-muted-foreground mt-0.5">
-                            {userName}
-                            {ev.area?.name ? ` · ${ev.area.name}` : ""} ·{" "}
-                            {formatFechaHora(ev.created_at)}
-                          </p>
-                          {typeof ev.metadata?.note === "string" && (
-                            <p className="mt-2 text-[12.5px] text-foreground/80 bg-muted rounded-lg px-3 py-2 border border-border/60">
-                              {ev.metadata.note as string}
+                          <div
+                            className={cn(
+                              "w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 z-10 text-[10px] font-bold ring-2 ring-background",
+                              idx === 0
+                                ? "bg-primary text-primary-foreground"
+                                : "bg-muted border border-border text-muted-foreground",
+                            )}
+                          >
+                            {idx === 0 ? (
+                              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <circle cx="12" cy="12" r="3" strokeWidth={2.5} fill="currentColor" />
+                              </svg>
+                            ) : (
+                              userInitials(ev.user?.full_name, ev.user?.email)
+                            )}
+                          </div>
+                          <div className="flex-1 min-w-0 pt-0.5">
+                            <div className="flex items-center justify-between gap-2">
+                              <p className="text-[13.5px] font-semibold text-foreground leading-snug truncate">
+                                {eventoLabel(ev)}
+                              </p>
+                              <svg
+                                className={cn(
+                                  "w-3.5 h-3.5 text-muted-foreground/50 flex-shrink-0 transition-transform",
+                                  isExpanded && "rotate-180",
+                                )}
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                              >
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                              </svg>
+                            </div>
+                            <p className="text-[12px] text-muted-foreground mt-0.5">
+                              {userName}
+                              {ev.area?.name ? ` · ${ev.area.name}` : ""} ·{" "}
+                              {formatFechaHora(ev.created_at)}
                             </p>
-                          )}
-                        </div>
+                            {typeof ev.metadata?.note === "string" && (
+                              <p className="mt-2 text-[12.5px] text-foreground/80 bg-muted rounded-lg px-3 py-2 border border-border/60">
+                                {ev.metadata.note as string}
+                              </p>
+                            )}
+                          </div>
+                        </button>
+
+                        {isExpanded && (
+                          <div className="ml-10 mt-2 mb-1 p-3.5 rounded-lg border border-border bg-background space-y-3">
+                            <div className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1.5 text-[12px]">
+                              <span className="text-muted-foreground font-medium">Evento</span>
+                              <span className="font-mono text-foreground">{ev.event_type}</span>
+
+                              {ev.user?.email && (
+                                <>
+                                  <span className="text-muted-foreground font-medium">Mail</span>
+                                  <span className="font-mono text-foreground break-all">{ev.user.email}</span>
+                                </>
+                              )}
+
+                              <span className="text-muted-foreground font-medium">Fecha</span>
+                              <span className="font-mono text-foreground">{new Date(ev.created_at).toISOString()}</span>
+
+                              {otherMetadata.map(([k, v]) => (
+                                <span key={k} className="contents">
+                                  <span className="text-muted-foreground font-medium">{k}</span>
+                                  <span className="font-mono text-foreground break-all">
+                                    {typeof v === "object" ? JSON.stringify(v) : String(v)}
+                                  </span>
+                                </span>
+                              ))}
+                            </div>
+
+                            {hasUserEmail && (
+                              <div className="pt-2 border-t border-border/60">
+                                <a
+                                  href={buildMailtoForEvent(ev.user!.email, ev.user!.full_name, ev)}
+                                  className="inline-flex items-center gap-1.5 text-[12px] font-semibold text-primary hover:bg-primary/10 px-2.5 py-1.5 rounded-md transition-colors"
+                                >
+                                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                                  </svg>
+                                  Consultar a {userName}
+                                </a>
+                              </div>
+                            )}
+                          </div>
+                        )}
                       </div>
                     );
                   })}
