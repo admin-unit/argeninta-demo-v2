@@ -1,10 +1,15 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { FirmaModal } from "./firma-modal";
 import { EstadoBadge } from "./estado-badge";
 import { TIPO_LABEL, type EstadoSolicitud, type Solicitud, type TipoGestion } from "@/types";
+import {
+  avanzarSolicitud,
+  agregarNotaSolicitud,
+} from "@/app/actions/solicitudes";
 
 type Firmante = {
   nombre: string;
@@ -113,10 +118,12 @@ export function SolicitudDetalleArgeninta({
   firmantesIniciales: Firmante[];
   necesitaFirma: boolean;
 }) {
-  const [estado, setEstado] = useState<EstadoSolicitud>(
-    solicitud.status as EstadoSolicitud
-  );
-  const [historialLocal, setHistorialLocal] = useState<HistorialEvent[]>(historial);
+  // Estado de status leído directamente del prop — la persistencia se hace
+  // server-side y luego router.refresh() trae el valor nuevo.
+  const estado = solicitud.status as EstadoSolicitud;
+  // Entries que solo viven local (firmas — todavía no persisten a DB).
+  const [pendingLocalEntries, setPendingLocalEntries] = useState<HistorialEvent[]>([]);
+  const historialLocal: HistorialEvent[] = [...historial, ...pendingLocalEntries];
   const [firmantes, setFirmantes] = useState<Firmante[]>(firmantesIniciales);
   const [showFirmaPad, setShowFirmaPad] = useState(false);
   const [firmaTarget, setFirmaTarget] = useState<string | null>(null);
@@ -124,6 +131,10 @@ export function SolicitudDetalleArgeninta({
   const [nota, setNota] = useState("");
   const [showNota, setShowNota] = useState(false);
   const [expandedEventId, setExpandedEventId] = useState<number | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [isAvanzando, startAvanzar] = useTransition();
+  const [isGuardandoNota, startNota] = useTransition();
+  const router = useRouter();
 
   function buildMailtoForEvent(
     targetEmail: string,
@@ -168,34 +179,32 @@ export function SolicitudDetalleArgeninta({
 
   function avanzarEstado() {
     if (!transition) return;
-    const entry: HistorialEvent = {
-      id: -Date.now(),
-      event_type: "solicitud_state_change",
-      description: transition.accion + " (demo — no persiste)",
-      metadata: { from: estado, to: transition.next, demo: true },
-      created_at: nowIso(),
-      user: { id: "demo", full_name: "Usuario demo", email: "demo@local" },
-      area: null,
-    };
-    setEstado(transition.next);
-    setHistorialLocal((prev) => [...prev, entry]);
-    setConfirming(false);
+    setActionError(null);
+    startAvanzar(async () => {
+      const result = await avanzarSolicitud(solicitud.id);
+      if (!result.ok) {
+        setActionError(result.error);
+        return;
+      }
+      setConfirming(false);
+      router.refresh();
+    });
   }
 
   function agregarNota() {
-    if (!nota.trim()) return;
-    const entry: HistorialEvent = {
-      id: -Date.now(),
-      event_type: "note",
-      description: "Nota interna agregada (demo)",
-      metadata: { note: nota.trim() },
-      created_at: nowIso(),
-      user: { id: "demo", full_name: "Usuario demo", email: "demo@local" },
-      area: null,
-    };
-    setHistorialLocal((prev) => [...prev, entry]);
-    setNota("");
-    setShowNota(false);
+    const text = nota.trim();
+    if (!text) return;
+    setActionError(null);
+    startNota(async () => {
+      const result = await agregarNotaSolicitud(solicitud.id, text);
+      if (!result.ok) {
+        setActionError(result.error);
+        return;
+      }
+      setNota("");
+      setShowNota(false);
+      router.refresh();
+    });
   }
 
   function firmarDocumento(nombre: string, dataUrl: string) {
@@ -213,7 +222,7 @@ export function SolicitudDetalleArgeninta({
       user: { id: "demo", full_name: "Usuario demo", email: "demo@local" },
       area: null,
     };
-    setHistorialLocal((prev) => [...prev, entry]);
+    setPendingLocalEntries((prev) => [...prev, entry]);
     setShowFirmaPad(false);
     setFirmaTarget(null);
   }
@@ -302,18 +311,23 @@ export function SolicitudDetalleArgeninta({
                 className="w-full text-[13px] border border-border rounded-lg p-2.5 resize-none focus:outline-none focus:ring-2 focus:ring-ring/50 bg-background"
                 rows={2}
               />
-              <div className="flex justify-end gap-2 mt-2">
+              <div className="flex justify-end items-center gap-2 mt-2">
+                {actionError && (
+                  <span className="text-[11.5px] text-destructive mr-auto">{actionError}</span>
+                )}
                 <button
                   onClick={() => setShowNota(false)}
-                  className="text-[12px] text-muted-foreground hover:text-foreground transition-colors"
+                  disabled={isGuardandoNota}
+                  className="text-[12px] text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
                 >
                   Cancelar
                 </button>
                 <button
                   onClick={agregarNota}
-                  className="text-[12px] font-semibold text-primary hover:text-primary/70 transition-colors"
+                  disabled={isGuardandoNota || !nota.trim()}
+                  className="text-[12px] font-semibold text-primary hover:text-primary/70 transition-colors disabled:opacity-50"
                 >
-                  Guardar nota
+                  {isGuardandoNota ? "Guardando…" : "Guardar nota"}
                 </button>
               </div>
             </div>
@@ -568,31 +582,34 @@ export function SolicitudDetalleArgeninta({
             confirming ? (
               <div>
                 <p className="text-[12px] text-muted-foreground mb-2">
-                  ¿Confirmar &ldquo;{transition.label}&rdquo;? (Demo — no persiste todavía)
+                  ¿Confirmar &ldquo;{transition.label}&rdquo;?
                 </p>
                 <div className="flex gap-1.5">
                   <button
                     onClick={() => setConfirming(false)}
-                    className="flex-1 px-2 py-1.5 text-[12px] border border-border rounded-lg hover:bg-muted transition-colors"
+                    disabled={isAvanzando}
+                    className="flex-1 px-2 py-1.5 text-[12px] border border-border rounded-lg hover:bg-muted transition-colors disabled:opacity-50"
                   >
                     Cancelar
                   </button>
                   <button
                     onClick={avanzarEstado}
+                    disabled={isAvanzando}
                     className={cn(
-                      "flex-1 px-2 py-1.5 text-[12px] font-semibold text-white rounded-lg hover:opacity-90 transition-opacity",
+                      "flex-1 px-2 py-1.5 text-[12px] font-semibold text-white rounded-lg hover:opacity-90 transition-opacity disabled:opacity-60",
                       transition.color
                     )}
                   >
-                    Confirmar
+                    {isAvanzando ? "Guardando…" : "Confirmar"}
                   </button>
                 </div>
               </div>
             ) : (
               <button
                 onClick={() => setConfirming(true)}
+                disabled={isAvanzando}
                 className={cn(
-                  "w-full px-3 py-2 text-[12.5px] font-semibold text-white rounded-lg hover:opacity-90 transition-opacity",
+                  "w-full px-3 py-2 text-[12.5px] font-semibold text-white rounded-lg hover:opacity-90 transition-opacity disabled:opacity-60",
                   transition.color
                 )}
               >
@@ -606,6 +623,11 @@ export function SolicitudDetalleArgeninta({
                 : estado === "cancelled"
                 ? "Cancelada"
                 : "Sin transición disponible"}
+            </p>
+          )}
+          {actionError && (
+            <p className="text-[11.5px] text-destructive mt-2 leading-snug">
+              {actionError}
             </p>
           )}
         </div>
