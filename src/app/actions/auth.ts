@@ -3,6 +3,8 @@
 import { createClient } from "@/lib/supabase/server";
 import { headers } from "next/headers";
 
+const DEMO_PASSWORD = "demo1234";
+
 /**
  * Obtiene la base URL del sitio respetando los headers de proxy (Caddy)
  * antes que el origin "interno" del servidor.
@@ -42,6 +44,26 @@ export async function signInWithMagicLink(email: string) {
   });
 
   if (error) throw new Error(error.message);
+}
+
+// Demo mode: sign in con email contra un password compartido conocido.
+// No requiere verificación de mail; todos los usuarios seedeados tienen el mismo password.
+export async function signInAsDemo(email: string) {
+  const normalized = email.trim().toLowerCase();
+  if (!normalized) throw new Error("Ingresá un email");
+
+  const supabase = await createClient();
+  const { error } = await supabase.auth.signInWithPassword({
+    email: normalized,
+    password: DEMO_PASSWORD,
+  });
+
+  if (error) {
+    if (error.message.toLowerCase().includes("invalid login")) {
+      throw new Error(`No existe un usuario con el email "${normalized}".`);
+    }
+    throw new Error(error.message);
+  }
 }
 
 export async function getGoogleOAuthUrl() {
