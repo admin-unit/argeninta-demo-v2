@@ -156,12 +156,23 @@ export default async function NuevaSolicitud({
                     <label className="block text-xs font-medium text-muted-foreground mb-1.5">
                       Organismo <span className="text-destructive">*</span>
                     </label>
-                    <select className="w-full px-3 py-2 text-sm border border-input rounded-lg focus:outline-none focus:ring-2 focus:ring-ring bg-background">
-                      <option value="">Seleccionar…</option>
-                      {[...new Set(cuentasFiltradas.map(c => c.organismo))].map(org => (
-                        <option key={org} value={org}>{org}</option>
-                      ))}
-                    </select>
+                    {(() => {
+                      const orgs = [...new Set(cuentasFiltradas.map(c => c.organismo))]
+                      const allOrgs = organismName && !orgs.includes(organismName)
+                        ? [organismName, ...orgs]
+                        : orgs
+                      return (
+                        <select
+                          defaultValue={organismName ?? ''}
+                          className="w-full px-3 py-2 text-sm border border-input rounded-lg focus:outline-none focus:ring-2 focus:ring-ring bg-background"
+                        >
+                          <option value="">Seleccionar…</option>
+                          {allOrgs.map(org => (
+                            <option key={org} value={org}>{org}</option>
+                          ))}
+                        </select>
+                      )
+                    })()}
                   </div>
                 </div>
                 <div>
