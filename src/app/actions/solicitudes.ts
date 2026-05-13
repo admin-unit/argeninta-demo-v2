@@ -156,6 +156,197 @@ export async function agregarNotaSolicitud(
   return { ok: true };
 }
 
+/**
+ * Deshace el último cambio de estado: busca el último evento "state_change"
+ * en audit_log, vuelve solicitudes.status a metadata.from y registra el undo.
+ */
+export async function deshacerUltimoPaso(
+  solicitudId: string,
+): Promise<{ ok: true; newStatus: EstadoSolicitud } | { ok: false; error: string }> {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: "No estás autenticado." };
+
+  const { data: lastChange } = await supabase
+    .from("audit_log")
+    .select("id, metadata, area_id")
+    .eq("solicitud_id", solicitudId)
+    .eq("event_type", "state_change")
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (!lastChange) {
+    return { ok: false, error: "No hay un cambio de estado previo para deshacer." };
+  }
+
+  const meta = (lastChange.metadata ?? {}) as Record<string, unknown>;
+  const previousStatus = meta.from as EstadoSolicitud | undefined;
+  if (!previousStatus) {
+    return { ok: false, error: "El último cambio no registró el estado anterior." };
+  }
+
+  // Estado actual + área para ver si tenemos que volver el área también
+  const { data: current } = await supabase
+    .from("solicitudes")
+    .select("status, current_area_id")
+    .eq("id", solicitudId)
+    .maybeSingle();
+  if (!current) return { ok: false, error: "No se encontró la solicitud." };
+
+  // Si la transición original tenía routeToArea, el área anterior se infiere
+  // buscando el evento state_change inmediatamente anterior. Si no hay,
+  // dejamos el área como está.
+  const { data: previousChange } = await supabase
+    .from("audit_log")
+    .select("area_id, metadata")
+    .eq("solicitud_id", solicitudId)
+    .eq("event_type", "state_change")
+    .order("created_at", { ascending: false })
+    .range(1, 1)
+    .maybeSingle();
+
+  const restoredAreaId = previousChange?.area_id ?? current.current_area_id;
+
+  const updatePayload: Record<string, unknown> = {
+    status: previousStatus,
+    current_area_id: restoredAreaId,
+    updated_at: new Date().toISOString(),
+  };
+  // Limpiar timestamps si retrocedemos a un punto antes del posteo / cierre
+  if (previousStatus === "in_progress" || previousStatus === "in_review") {
+    updatePayload.posted_at = null;
+  }
+  if (previousStatus !== "closed") {
+    updatePayload.closed_at = null;
+  }
+
+  const { error: updErr } = await supabase
+    .from("solicitudes")
+    .update(updatePayload)
+    .eq("id", solicitudId);
+  if (updErr) return { ok: false, error: `No se pudo deshacer: ${updErr.message}` };
+
+  const { error: auditErr } = await supabase.from("audit_log").insert({
+    user_id: user.id,
+    solicitud_id: solicitudId,
+    area_id: restoredAreaId,
+    event_type: "state_undo",
+    description: `Revertido: volvió a "${previousStatus}"`,
+    metadata: { from: current.status, to: previousStatus, undo_of_event: lastChange.id },
+  });
+  if (auditErr) {
+    return { ok: false, error: `Estado revertido pero falló el audit log: ${auditErr.message}` };
+  }
+
+  revalidatePath(`/solicitudes/${solicitudId}`);
+  return { ok: true, newStatus: previousStatus };
+}
+
+/**
+ * Deriva la solicitud manualmente a otra área, sin cambiar status.
+ * Útil para mandar a Jurídicos, Capital Humano, etc., fuera del flujo normal.
+ */
+export async function derivarManualmente(
+  solicitudId: string,
+  targetAreaId: string,
+  motivo?: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: "No estás autenticado." };
+
+  const { data: current } = await supabase
+    .from("solicitudes")
+    .select("current_area_id")
+    .eq("id", solicitudId)
+    .maybeSingle();
+  if (!current) return { ok: false, error: "No se encontró la solicitud." };
+
+  if (current.current_area_id === targetAreaId) {
+    return { ok: false, error: "La solicitud ya está en esa área." };
+  }
+
+  const { data: targetArea } = await supabase
+    .from("internal_areas")
+    .select("name")
+    .eq("id", targetAreaId)
+    .maybeSingle();
+  if (!targetArea) return { ok: false, error: "Área destino no encontrada." };
+
+  const { error: updErr } = await supabase
+    .from("solicitudes")
+    .update({ current_area_id: targetAreaId, updated_at: new Date().toISOString() })
+    .eq("id", solicitudId);
+  if (updErr) return { ok: false, error: `No se pudo derivar: ${updErr.message}` };
+
+  const { error: auditErr } = await supabase.from("audit_log").insert({
+    user_id: user.id,
+    solicitud_id: solicitudId,
+    area_id: targetAreaId,
+    event_type: "manual_routing",
+    description: `Derivada manualmente a ${targetArea.name}`,
+    metadata: motivo
+      ? { from_area_id: current.current_area_id, to_area_id: targetAreaId, motivo }
+      : { from_area_id: current.current_area_id, to_area_id: targetAreaId },
+  });
+  if (auditErr) {
+    return { ok: false, error: `Derivada pero falló el audit log: ${auditErr.message}` };
+  }
+
+  revalidatePath(`/solicitudes/${solicitudId}`);
+  return { ok: true };
+}
+
+/**
+ * Cancela la solicitud — pone status='cancelled' desde cualquier estado.
+ */
+export async function cancelarSolicitud(
+  solicitudId: string,
+  motivo: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const text = motivo.trim();
+  if (!text) return { ok: false, error: "Hay que indicar la razón de la cancelación." };
+
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: "No estás autenticado." };
+
+  const { data: current } = await supabase
+    .from("solicitudes")
+    .select("status, current_area_id")
+    .eq("id", solicitudId)
+    .maybeSingle();
+  if (!current) return { ok: false, error: "No se encontró la solicitud." };
+  if (current.status === "cancelled") {
+    return { ok: false, error: "La solicitud ya estaba cancelada." };
+  }
+  if (current.status === "closed") {
+    return { ok: false, error: "No se puede cancelar un expediente cerrado." };
+  }
+
+  const { error: updErr } = await supabase
+    .from("solicitudes")
+    .update({ status: "cancelled", updated_at: new Date().toISOString() })
+    .eq("id", solicitudId);
+  if (updErr) return { ok: false, error: `No se pudo cancelar: ${updErr.message}` };
+
+  const { error: auditErr } = await supabase.from("audit_log").insert({
+    user_id: user.id,
+    solicitud_id: solicitudId,
+    area_id: current.current_area_id,
+    event_type: "cancellation",
+    description: `Expediente cancelado: ${text}`,
+    metadata: { from: current.status, motivo: text },
+  });
+  if (auditErr) {
+    return { ok: false, error: `Cancelada pero falló el audit log: ${auditErr.message}` };
+  }
+
+  revalidatePath(`/solicitudes/${solicitudId}`);
+  return { ok: true };
+}
+
 export async function getSolicitudesForArea(
   areaId: string,
 ): Promise<SolicitudListItem[]> {

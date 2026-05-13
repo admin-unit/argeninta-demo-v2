@@ -4,6 +4,7 @@ import {
   getSolicitudById,
   getAuditLogForSolicitud,
   getCurrentProfileWithContext,
+  getInternalAreas,
   AREAS_INTERNACIONAL,
 } from "@/lib/data";
 import { EstadoBadge } from "@/components/solicitudes/estado-badge";
@@ -35,10 +36,11 @@ export default async function SolicitudDetalle({
 }) {
   const { id } = await params;
 
-  const [solicitud, auditLog, ctx] = await Promise.all([
+  const [solicitud, auditLog, ctx, allAreas] = await Promise.all([
     getSolicitudById(id),
     getAuditLogForSolicitud(id),
     getCurrentProfileWithContext(),
+    getInternalAreas(),
   ]);
   if (!solicitud) notFound();
 
@@ -205,6 +207,7 @@ export default async function SolicitudDetalle({
           beneficiario={beneficiario}
           firmantesIniciales={necesitaFirma ? FIRMANTES_DEMO : []}
           necesitaFirma={necesitaFirma}
+          allAreas={allAreas.map((a) => ({ id: a.id, name: a.name }))}
         />
       )}
     </div>

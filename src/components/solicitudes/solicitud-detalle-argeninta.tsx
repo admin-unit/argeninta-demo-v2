@@ -9,6 +9,9 @@ import { TIPO_LABEL, type EstadoSolicitud, type Solicitud, type TipoGestion } fr
 import {
   avanzarSolicitud,
   agregarNotaSolicitud,
+  deshacerUltimoPaso,
+  derivarManualmente,
+  cancelarSolicitud,
 } from "@/app/actions/solicitudes";
 
 type Firmante = {
@@ -111,12 +114,14 @@ export function SolicitudDetalleArgeninta({
   beneficiario,
   firmantesIniciales,
   necesitaFirma,
+  allAreas,
 }: {
   solicitud: Solicitud;
   historial: HistorialEvent[];
   beneficiario: string;
   firmantesIniciales: Firmante[];
   necesitaFirma: boolean;
+  allAreas: Array<{ id: string; name: string }>;
 }) {
   // Estado de status leído directamente del prop — la persistencia se hace
   // server-side y luego router.refresh() trae el valor nuevo.
@@ -134,7 +139,19 @@ export function SolicitudDetalleArgeninta({
   const [actionError, setActionError] = useState<string | null>(null);
   const [isAvanzando, startAvanzar] = useTransition();
   const [isGuardandoNota, startNota] = useTransition();
+  const [isDeshaciendo, startDeshacer] = useTransition();
+  const [isDerivando, startDerivar] = useTransition();
+  const [isCancelando, startCancelar] = useTransition();
+  const [showDerivar, setShowDerivar] = useState(false);
+  const [areaDestino, setAreaDestino] = useState<string>("");
+  const [motivoDerivar, setMotivoDerivar] = useState("");
+  const [showCancelar, setShowCancelar] = useState(false);
+  const [motivoCancelar, setMotivoCancelar] = useState("");
   const router = useRouter();
+
+  // El último evento de tipo state_change determina si hay algo para "deshacer"
+  const hayCambioPrevio = historial.some((e) => e.event_type === "state_change");
+  const puedeCancelar = estado !== "closed" && estado !== "cancelled";
 
   function buildMailtoForEvent(
     targetEmail: string,
@@ -203,6 +220,58 @@ export function SolicitudDetalleArgeninta({
       }
       setNota("");
       setShowNota(false);
+      router.refresh();
+    });
+  }
+
+  function handleDeshacer() {
+    if (!confirm("¿Volver al estado anterior? El cambio queda registrado en la trazabilidad.")) return;
+    setActionError(null);
+    startDeshacer(async () => {
+      const r = await deshacerUltimoPaso(solicitud.id);
+      if (!r.ok) {
+        setActionError(r.error);
+        return;
+      }
+      router.refresh();
+    });
+  }
+
+  function handleDerivar() {
+    if (!areaDestino) return;
+    setActionError(null);
+    startDerivar(async () => {
+      const r = await derivarManualmente(
+        solicitud.id,
+        areaDestino,
+        motivoDerivar.trim() || undefined,
+      );
+      if (!r.ok) {
+        setActionError(r.error);
+        return;
+      }
+      setShowDerivar(false);
+      setAreaDestino("");
+      setMotivoDerivar("");
+      router.refresh();
+    });
+  }
+
+  function handleCancelar() {
+    const text = motivoCancelar.trim();
+    if (!text) {
+      setActionError("Indicá la razón de la cancelación.");
+      return;
+    }
+    setActionError(null);
+    startCancelar(async () => {
+      const r = await cancelarSolicitud(solicitud.id, text);
+      if (!r.ok) {
+        setActionError(r.error);
+        return;
+      }
+      setShowCancelar(false);
+      setMotivoCancelar("");
       router.refresh();
     });
   }
@@ -630,6 +699,128 @@ export function SolicitudDetalleArgeninta({
               {actionError}
             </p>
           )}
+
+          {/* Acciones de escape */}
+          <div className="mt-3 pt-3 border-t border-border/60 space-y-1.5">
+            {hayCambioPrevio && (
+              <button
+                onClick={handleDeshacer}
+                disabled={isDeshaciendo}
+                className="w-full text-[11.5px] font-medium text-muted-foreground hover:text-foreground hover:bg-muted py-1.5 rounded transition-colors disabled:opacity-50 flex items-center justify-center gap-1.5"
+              >
+                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
+                </svg>
+                {isDeshaciendo ? "Deshaciendo…" : "Deshacer último paso"}
+              </button>
+            )}
+
+            {puedeCancelar && (
+              <button
+                onClick={() => setShowDerivar((v) => !v)}
+                disabled={isDerivando}
+                className="w-full text-[11.5px] font-medium text-muted-foreground hover:text-foreground hover:bg-muted py-1.5 rounded transition-colors disabled:opacity-50 flex items-center justify-center gap-1.5"
+              >
+                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                </svg>
+                Derivar manualmente a otra área
+              </button>
+            )}
+
+            {showDerivar && (
+              <div className="bg-muted/30 border border-border rounded-lg p-2.5 space-y-2">
+                <select
+                  value={areaDestino}
+                  onChange={(e) => setAreaDestino(e.target.value)}
+                  className="w-full text-[12px] border border-border rounded px-2 py-1.5 bg-card focus:outline-none focus:ring-2 focus:ring-ring/40"
+                >
+                  <option value="">Elegí un área…</option>
+                  {allAreas
+                    .filter((a) => a.id !== solicitud.current_area_id)
+                    .map((a) => (
+                      <option key={a.id} value={a.id}>
+                        {a.name}
+                      </option>
+                    ))}
+                </select>
+                <input
+                  type="text"
+                  value={motivoDerivar}
+                  onChange={(e) => setMotivoDerivar(e.target.value)}
+                  placeholder="Motivo (opcional)"
+                  className="w-full text-[12px] border border-border rounded px-2 py-1.5 bg-card focus:outline-none focus:ring-2 focus:ring-ring/40"
+                />
+                <div className="flex gap-1.5">
+                  <button
+                    onClick={() => {
+                      setShowDerivar(false);
+                      setAreaDestino("");
+                      setMotivoDerivar("");
+                    }}
+                    disabled={isDerivando}
+                    className="flex-1 text-[11.5px] py-1.5 rounded border border-border text-muted-foreground hover:bg-muted transition-colors disabled:opacity-50"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    onClick={handleDerivar}
+                    disabled={isDerivando || !areaDestino}
+                    className="flex-1 text-[11.5px] font-semibold py-1.5 rounded bg-primary text-primary-foreground hover:opacity-90 transition-opacity disabled:opacity-50"
+                  >
+                    {isDerivando ? "Derivando…" : "Derivar"}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {puedeCancelar && !showCancelar && (
+              <button
+                onClick={() => setShowCancelar(true)}
+                className="w-full text-[11.5px] font-medium text-rose-600 hover:text-rose-700 hover:bg-rose-50 py-1.5 rounded transition-colors flex items-center justify-center gap-1.5"
+              >
+                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+                Cancelar expediente
+              </button>
+            )}
+
+            {showCancelar && (
+              <div className="bg-rose-50 border border-rose-200 rounded-lg p-2.5 space-y-2">
+                <p className="text-[11.5px] text-rose-900 font-medium">
+                  Cancelar este expediente. Esta acción queda registrada.
+                </p>
+                <input
+                  type="text"
+                  value={motivoCancelar}
+                  onChange={(e) => setMotivoCancelar(e.target.value)}
+                  placeholder="Razón de la cancelación"
+                  autoFocus
+                  className="w-full text-[12px] border border-rose-300 rounded px-2 py-1.5 bg-card focus:outline-none focus:ring-2 focus:ring-rose-300/60"
+                />
+                <div className="flex gap-1.5">
+                  <button
+                    onClick={() => {
+                      setShowCancelar(false);
+                      setMotivoCancelar("");
+                    }}
+                    disabled={isCancelando}
+                    className="flex-1 text-[11.5px] py-1.5 rounded border border-border text-muted-foreground hover:bg-muted transition-colors disabled:opacity-50"
+                  >
+                    Volver
+                  </button>
+                  <button
+                    onClick={handleCancelar}
+                    disabled={isCancelando || !motivoCancelar.trim()}
+                    className="flex-1 text-[11.5px] font-semibold py-1.5 rounded bg-rose-600 text-white hover:bg-rose-700 transition-colors disabled:opacity-50"
+                  >
+                    {isCancelando ? "Cancelando…" : "Confirmar cancelación"}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Fechas */}
