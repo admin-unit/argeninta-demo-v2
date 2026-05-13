@@ -558,7 +558,7 @@ export async function getGlobalSummary() {
       .eq("status", "closed"),
     supabase
       .from("v_solicitudes_full")
-      .select("current_area_name, status")
+      .select("current_area_id, current_area_name, status")
       .limit(1000),
   ]);
 

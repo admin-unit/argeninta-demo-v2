@@ -11,7 +11,11 @@ interface Props {
     totalSolicitudes: number;
     enProceso: number;
     completadas: number;
-    porArea: Array<{ current_area_name: string | null; status: string }>;
+    porArea: Array<{
+      current_area_id: string | null;
+      current_area_name: string | null;
+      status: string;
+    }>;
   };
   solicitudesRecientes: Array<{
     id: string;

@@ -1,46 +1,79 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useMemo, useState, useTransition } from "react";
 import { cn, formatImporte, formatFecha } from "@/lib/utils";
-
-interface SolicitudReciente {
-  id: string;
-  numero_expediente: string | null;
-  tipo_name: string | null;
-  concepto: string | null;
-  importe: number | null;
-  moneda: string | null;
-  status: string;
-  organism_short_name: string | null;
-  current_area_name: string | null;
-  created_at: string;
-}
+import {
+  getSolicitudesForArea,
+  type SolicitudListItem,
+} from "@/app/actions/solicitudes";
 
 export function PorAreaFiltro({
   porArea,
   solicitudesRecientes,
 }: {
-  porArea: Array<{ current_area_name: string | null; status: string }>;
-  solicitudesRecientes: SolicitudReciente[];
+  porArea: Array<{
+    current_area_id: string | null;
+    current_area_name: string | null;
+    status: string;
+  }>;
+  solicitudesRecientes: SolicitudListItem[];
 }) {
-  const [seleccionada, setSeleccionada] = useState<string | null>(null);
+  // areaId puede ser null para "(sin área)" — entonces filtramos client-side
+  const [seleccionada, setSeleccionada] = useState<{
+    id: string | null;
+    name: string;
+  } | null>(null);
+  const [cacheByArea, setCacheByArea] = useState<Record<string, SolicitudListItem[]>>({});
+  const [isPending, startTransition] = useTransition();
 
   const conteoPorArea = useMemo(() => {
-    const m = new Map<string, number>();
+    const m = new Map<
+      string,
+      { id: string | null; name: string; count: number }
+    >();
     for (const s of porArea) {
-      const a = s.current_area_name || "(sin área)";
-      m.set(a, (m.get(a) || 0) + 1);
+      const name = s.current_area_name || "(sin área)";
+      const id = s.current_area_id;
+      const key = id ?? `__sin__:${name}`;
+      const prev = m.get(key);
+      if (prev) prev.count += 1;
+      else m.set(key, { id, name, count: 1 });
     }
-    return [...m.entries()].sort((a, b) => b[1] - a[1]);
+    return [...m.values()].sort((a, b) => b.count - a.count);
   }, [porArea]);
 
-  const filtradas = useMemo(() => {
+  function pickArea(area: { id: string | null; name: string } | null) {
+    if (!area) {
+      setSeleccionada(null);
+      return;
+    }
+    setSeleccionada(area);
+    if (area.id && !cacheByArea[area.id]) {
+      startTransition(async () => {
+        const rows = await getSolicitudesForArea(area.id!);
+        setCacheByArea((prev) => ({ ...prev, [area.id!]: rows }));
+      });
+    }
+  }
+
+  // Fuente de datos para la tabla:
+  //  - sin selección → recientes
+  //  - con selección + cache → cache
+  //  - con selección sin cache (loading) → recientes filtradas como fallback
+  const filtradas: SolicitudListItem[] = useMemo(() => {
     if (!seleccionada) return solicitudesRecientes;
+    if (seleccionada.id && cacheByArea[seleccionada.id]) {
+      return cacheByArea[seleccionada.id];
+    }
+    // Fallback mientras carga, o "(sin área)" (no tiene id)
     return solicitudesRecientes.filter(
-      (s) => (s.current_area_name || "(sin área)") === seleccionada,
+      (s) => (s.current_area_name || "(sin área)") === seleccionada.name,
     );
-  }, [solicitudesRecientes, seleccionada]);
+  }, [seleccionada, solicitudesRecientes, cacheByArea]);
+
+  const loadingArea =
+    !!seleccionada?.id && !cacheByArea[seleccionada.id] && isPending;
 
   if (conteoPorArea.length === 0) return null;
 
@@ -51,7 +84,7 @@ export function PorAreaFiltro({
           <h3 className="text-[13px] font-semibold text-gray-800">Por área</h3>
           {seleccionada && (
             <button
-              onClick={() => setSeleccionada(null)}
+              onClick={() => pickArea(null)}
               className="text-[11.5px] text-gray-500 hover:text-gray-800 underline underline-offset-2"
             >
               Limpiar filtro
@@ -59,15 +92,15 @@ export function PorAreaFiltro({
           )}
         </div>
         <p className="text-[11.5px] text-gray-500 mb-3">
-          Tocá un área para filtrar las solicitudes recientes que la atraviesan.
+          Tocá un área para ver las solicitudes que están actualmente en esa instancia.
         </p>
         <div className="grid grid-cols-3 gap-3">
-          {conteoPorArea.map(([area, count]) => {
-            const active = seleccionada === area;
+          {conteoPorArea.map((a) => {
+            const active = seleccionada?.name === a.name;
             return (
               <button
-                key={area}
-                onClick={() => setSeleccionada(active ? null : area)}
+                key={`${a.id ?? "_"}-${a.name}`}
+                onClick={() => pickArea(active ? null : { id: a.id, name: a.name })}
                 className={cn(
                   "text-left rounded-lg p-3 border transition-all",
                   active
@@ -81,7 +114,7 @@ export function PorAreaFiltro({
                     active ? "text-primary font-semibold" : "text-gray-600",
                   )}
                 >
-                  {area}
+                  {a.name}
                 </p>
                 <p
                   className={cn(
@@ -89,7 +122,7 @@ export function PorAreaFiltro({
                     active ? "text-primary" : "text-gray-900",
                   )}
                 >
-                  {count}
+                  {a.count}
                 </p>
               </button>
             );
@@ -100,10 +133,10 @@ export function PorAreaFiltro({
       <div className="bg-white border border-gray-200 rounded-xl p-5">
         <div className="flex items-center justify-between mb-3">
           <h3 className="text-[13px] font-semibold text-gray-800">
-            Solicitudes recientes
-            {seleccionada && (
+            {seleccionada ? `Solicitudes en ${seleccionada.name}` : "Solicitudes recientes"}
+            {seleccionada && !loadingArea && (
               <span className="ml-2 inline-flex items-center gap-1 text-[11px] font-medium text-primary bg-primary/[0.08] border border-primary/15 px-2 py-0.5 rounded-full">
-                Filtrado: {seleccionada}
+                {filtradas.length} {filtradas.length === 1 ? "expediente" : "expedientes"}
               </span>
             )}
           </h3>
@@ -115,10 +148,18 @@ export function PorAreaFiltro({
           </Link>
         </div>
 
-        {filtradas.length === 0 ? (
+        {loadingArea ? (
+          <div className="py-12 flex flex-col items-center justify-center text-gray-500">
+            <svg className="animate-spin w-5 h-5 mb-2" fill="none" viewBox="0 0 24 24">
+              <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" className="opacity-25" />
+              <path fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" className="opacity-75" />
+            </svg>
+            <p className="text-[12.5px]">Cargando expedientes de {seleccionada?.name}…</p>
+          </div>
+        ) : filtradas.length === 0 ? (
           <p className="text-sm text-gray-500">
             {seleccionada
-              ? `Ninguna de las solicitudes recientes está actualmente en ${seleccionada}.`
+              ? `No hay solicitudes actualmente en ${seleccionada.name}.`
               : "Todavía no hay solicitudes en el sistema."}
           </p>
         ) : (
