@@ -5,9 +5,15 @@ import { useRef, useEffect, useState } from 'react'
 export function FirmaPad({
   onSave,
   onCancel,
+  width = 420,
+  height = 130,
+  hideCancel = false,
 }: {
   onSave: (dataUrl: string) => void
   onCancel: () => void
+  width?: number
+  height?: number
+  hideCancel?: boolean
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const drawing = useRef(false)
@@ -80,8 +86,8 @@ export function FirmaPad({
       <p className="text-[12px] text-muted-foreground mb-2">Dibujá tu firma con el mouse o dedo:</p>
       <canvas
         ref={canvasRef}
-        width={420}
-        height={130}
+        width={width}
+        height={height}
         className="w-full border-2 border-dashed border-border rounded-xl cursor-crosshair bg-white touch-none"
         style={{ touchAction: 'none' }}
         onMouseDown={startDraw}
@@ -99,12 +105,14 @@ export function FirmaPad({
         >
           Limpiar
         </button>
-        <button
-          onClick={onCancel}
-          className="px-3 py-1.5 text-[12px] text-muted-foreground border border-border rounded-lg hover:bg-muted transition-colors"
-        >
-          Cancelar
-        </button>
+        {!hideCancel && (
+          <button
+            onClick={onCancel}
+            className="px-3 py-1.5 text-[12px] text-muted-foreground border border-border rounded-lg hover:bg-muted transition-colors"
+          >
+            Cancelar
+          </button>
+        )}
         <button
           onClick={() => {
             const canvas = canvasRef.current

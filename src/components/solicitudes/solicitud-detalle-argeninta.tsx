@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { cn } from "@/lib/utils";
-import { FirmaPad } from "./firma-pad";
+import { FirmaModal } from "./firma-modal";
 import { EstadoBadge } from "./estado-badge";
 import { TIPO_LABEL, type EstadoSolicitud, type Solicitud, type TipoGestion } from "@/types";
 
@@ -437,7 +437,7 @@ export function SolicitudDetalleArgeninta({
                         {f.estado === "firmado" ? "Firmado" : "Pendiente de firma"}
                       </p>
                     </div>
-                    {f.estado === "pendiente" && !showFirmaPad && (
+                    {f.estado === "pendiente" && (
                       <button
                         onClick={() => {
                           setFirmaTarget(f.nombre);
@@ -463,22 +463,18 @@ export function SolicitudDetalleArgeninta({
               ))}
             </div>
 
-            {showFirmaPad && firmaTarget && (
-              <div className="bg-white rounded-xl border border-border p-3 mt-2">
-                <p className="text-[12px] font-semibold text-foreground mb-2">
-                  Firma — {firmaTarget}
-                </p>
-                <FirmaPad
-                  onSave={(dataUrl) => firmarDocumento(firmaTarget, dataUrl)}
-                  onCancel={() => {
-                    setShowFirmaPad(false);
-                    setFirmaTarget(null);
-                  }}
-                />
-              </div>
-            )}
           </div>
         )}
+
+        <FirmaModal
+          isOpen={showFirmaPad && firmaTarget !== null}
+          firmante={firmaTarget}
+          onSave={(dataUrl) => firmaTarget && firmarDocumento(firmaTarget, dataUrl)}
+          onClose={() => {
+            setShowFirmaPad(false);
+            setFirmaTarget(null);
+          }}
+        />
 
         {/* Avanzar estado */}
         <div className="bg-card rounded-xl border border-border p-4">
