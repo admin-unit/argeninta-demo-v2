@@ -324,3 +324,28 @@ export async function convertirMailASolicitud(
   revalidatePath(`/solicitudes/${solicitudId}`);
   return { ok: true, solicitudId };
 }
+
+/** Dispara un sync IMAP on-demand desde el browser. Valida acceso primero. */
+export async function syncInboxNow(): Promise<
+  { ok: true; synced: number; skipped: number } | { ok: false; error: string }
+> {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: "No autenticado." };
+
+  const { canAccessInbox } = await import("@/lib/data");
+  if (!(await canAccessInbox())) {
+    return { ok: false, error: "Sin permisos para sincronizar la bandeja." };
+  }
+
+  try {
+    const { syncImapInbox } = await import("@/lib/imap/sync");
+    const result = await syncImapInbox();
+    if (result.synced > 0) {
+      revalidatePath("/bandeja/mails");
+    }
+    return { ok: true, synced: result.synced, skipped: result.skipped };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) };
+  }
+}

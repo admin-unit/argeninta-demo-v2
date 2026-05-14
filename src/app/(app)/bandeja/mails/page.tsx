@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { canAccessInbox, getInboxEmails, type InboxStatus } from "@/lib/data";
 import { cn } from "@/lib/utils";
+import { SyncControl } from "@/components/bandeja/sync-control";
 
 export const dynamic = "force-dynamic";
 
@@ -63,12 +64,15 @@ export default async function BandejaMailsPage({
 
   return (
     <div className="p-8">
-      <div className="mb-6">
-        <h1 className="text-2xl font-semibold text-foreground">Bandeja de mails</h1>
-        <p className="text-sm text-muted-foreground mt-1">
-          Casilla compartida — sincronizada cada 5 minutos vía IMAP.{" "}
-          {counts.all} mail{counts.all !== 1 ? "s" : ""} · {counts.unprocessed} sin procesar
-        </p>
+      <div className="mb-6 flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-semibold text-foreground">Bandeja de mails</h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            Casilla compartida — sync automático cada 10 s mientras tengas esta página abierta.{" "}
+            {counts.all} mail{counts.all !== 1 ? "s" : ""} · {counts.unprocessed} sin procesar
+          </p>
+        </div>
+        <SyncControl />
       </div>
 
       {/* Filtros + búsqueda */}

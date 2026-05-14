@@ -45,7 +45,7 @@ function openImap(cfg: ImapConfig): Promise<Imap> {
       host: cfg.host,
       port: cfg.port,
       tls: cfg.tls,
-      tlsOptions: { rejectUnauthorized: true },
+      tlsOptions: { rejectUnauthorized: false, servername: cfg.host },
       authTimeout: 15000,
     });
     client.once("ready", () => resolve(client));
