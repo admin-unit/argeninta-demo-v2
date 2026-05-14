@@ -129,7 +129,15 @@ export async function syncImapInbox(): Promise<SyncResult> {
 
   try {
     await openBox(imap, "INBOX");
-    const uids = await search(imap, ["UNSEEN"]);
+    // Traemos todos los mails recientes y dedupeamos por Message-Id contra la DB.
+    // Más robusto que ["UNSEEN"]: no rompe si alguien lee/marca mails desde la
+    // webmail. Para casilla con mucho historial conviene acotar con SINCE.
+    const since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+    const sinceStr = since
+      .toLocaleDateString("en-US", { day: "2-digit", month: "short", year: "numeric" })
+      .replace(/,/g, "")
+      .replace(/ /g, "-");
+    const uids = await search(imap, [["SINCE", sinceStr]]);
 
     for (const uid of uids) {
       try {
@@ -144,7 +152,7 @@ export async function syncImapInbox(): Promise<SyncResult> {
             .eq("imap_message_id", messageId)
             .maybeSingle();
           if (existing) {
-            await addFlag(imap, uid, "\\Seen");
+            // No marcamos \Seen — dejamos la casilla intacta. Dedupe por Message-Id.
             result.skipped += 1;
             continue;
           }
@@ -225,7 +233,7 @@ export async function syncImapInbox(): Promise<SyncResult> {
           },
         });
 
-        await addFlag(imap, uid, "\\Seen");
+        // No marcamos \Seen — dejamos la casilla intacta. Dedupe por Message-Id.
         result.synced += 1;
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
