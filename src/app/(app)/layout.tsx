@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { AppShell } from "@/components/layout/app-shell";
 import type { SidebarUser } from "@/components/layout/sidebar";
-import { getCurrentProfileWithContext } from "@/lib/data";
+import { canAccessInbox, getCurrentProfileWithContext } from "@/lib/data";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -16,6 +16,7 @@ function computeInitials(name: string, email: string): string {
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const { profile, primary_organism, primary_area } = await getCurrentProfileWithContext();
   if (!profile) redirect("/login");
+  const inboxAccess = await canAccessInbox();
 
   // Super admins ven la vista interna (Argeninta). Externos puros ven "mi organismo".
   const role: "interno" | "externo" =
@@ -41,7 +42,12 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   };
 
   return (
-    <AppShell role={role} user={user} isSuperAdmin={profile.is_super_admin}>
+    <AppShell
+      role={role}
+      user={user}
+      isSuperAdmin={profile.is_super_admin}
+      canAccessInbox={inboxAccess}
+    >
       {children}
     </AppShell>
   );

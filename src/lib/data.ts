@@ -538,6 +538,242 @@ export async function getSolicitudCountByOrganism() {
 // RESUMEN GLOBAL para admin/super-admin
 // =============================================================================
 
+// =============================================================================
+// BANDEJA DE MAILS (Módulo 1)
+// =============================================================================
+
+export type InboxStatus = "unprocessed" | "read" | "processed" | "discarded";
+
+export interface InboxEmailRow {
+  id: string;
+  from_name: string | null;
+  from_email: string;
+  subject: string;
+  received_at: string;
+  status: InboxStatus;
+  current_area_id: string | null;
+  current_area_name: string | null;
+  attachment_count: number;
+}
+
+export interface InboxEmailDetail {
+  id: string;
+  imap_message_id: string | null;
+  imap_uid: number | null;
+  from_name: string | null;
+  from_email: string;
+  to_emails: string[] | null;
+  cc_emails: string[] | null;
+  subject: string;
+  body_text: string | null;
+  body_html: string | null;
+  received_at: string;
+  status: InboxStatus;
+  discarded_reason: string | null;
+  source: "imap" | "manual" | "forwarded";
+  uploaded_by: string | null;
+  current_area_id: string | null;
+  current_area_name: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface InboxAttachment {
+  id: string;
+  email_id: string;
+  filename: string;
+  mime_type: string | null;
+  size_bytes: number | null;
+  storage_path: string;
+  page_count: number | null;
+  created_at: string;
+}
+
+export interface SolicitudVinculable {
+  id: string;
+  numero_expediente: string | null;
+  concepto: string | null;
+  status: string;
+}
+
+/** True si el user logueado puede ver la bandeja de mails. */
+export const canAccessInbox = cache(async (): Promise<boolean> => {
+  const profile = await getCurrentUser();
+  if (!profile) return false;
+  if (profile.is_super_admin) return true;
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("internal_area_members")
+    .select("area:internal_areas(name)")
+    .eq("user_id", profile.id);
+  const names = new Set<string>();
+  for (const row of data ?? []) {
+    const area = row.area as { name?: string } | { name?: string }[] | null;
+    if (Array.isArray(area)) area.forEach((a) => a?.name && names.add(a.name));
+    else if (area?.name) names.add(area.name);
+  }
+  return names.has("Mesa de Entrada") || names.has("Dirección Ejecutiva");
+});
+
+export async function getInboxEmails(filters: {
+  status?: InboxStatus | "all";
+  search?: string;
+} = {}): Promise<InboxEmailRow[]> {
+  const supabase = await createClient();
+  let query = supabase
+    .from("inbox_emails")
+    .select(`
+      id, from_name, from_email, subject, received_at, status,
+      current_area_id,
+      area:internal_areas(name),
+      inbox_attachments(id)
+    `)
+    .order("received_at", { ascending: false })
+    .limit(300);
+  if (filters.status && filters.status !== "all") {
+    query = query.eq("status", filters.status);
+  }
+  if (filters.search) {
+    const q = filters.search.trim();
+    if (q) {
+      query = query.or(
+        `subject.ilike.%${q}%,from_email.ilike.%${q}%,from_name.ilike.%${q}%`,
+      );
+    }
+  }
+  const { data } = await query;
+  return (data ?? []).map((row) => {
+    const area = row.area as { name?: string } | { name?: string }[] | null;
+    const areaName = Array.isArray(area) ? area[0]?.name ?? null : area?.name ?? null;
+    const attCount = Array.isArray(row.inbox_attachments)
+      ? row.inbox_attachments.length
+      : 0;
+    return {
+      id: row.id as string,
+      from_name: (row.from_name as string | null) ?? null,
+      from_email: row.from_email as string,
+      subject: row.subject as string,
+      received_at: row.received_at as string,
+      status: row.status as InboxStatus,
+      current_area_id: (row.current_area_id as string | null) ?? null,
+      current_area_name: areaName,
+      attachment_count: attCount,
+    };
+  });
+}
+
+export async function getInboxEmailById(id: string): Promise<InboxEmailDetail | null> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("inbox_emails")
+    .select(`
+      id, imap_message_id, imap_uid, from_name, from_email, to_emails, cc_emails,
+      subject, body_text, body_html, received_at, status, discarded_reason,
+      source, uploaded_by, current_area_id, created_at, updated_at,
+      area:internal_areas(name)
+    `)
+    .eq("id", id)
+    .maybeSingle();
+  if (!data) return null;
+  const area = data.area as { name?: string } | { name?: string }[] | null;
+  const areaName = Array.isArray(area) ? area[0]?.name ?? null : area?.name ?? null;
+  return {
+    id: data.id as string,
+    imap_message_id: (data.imap_message_id as string | null) ?? null,
+    imap_uid: (data.imap_uid as number | null) ?? null,
+    from_name: (data.from_name as string | null) ?? null,
+    from_email: data.from_email as string,
+    to_emails: (data.to_emails as string[] | null) ?? null,
+    cc_emails: (data.cc_emails as string[] | null) ?? null,
+    subject: data.subject as string,
+    body_text: (data.body_text as string | null) ?? null,
+    body_html: (data.body_html as string | null) ?? null,
+    received_at: data.received_at as string,
+    status: data.status as InboxStatus,
+    discarded_reason: (data.discarded_reason as string | null) ?? null,
+    source: data.source as "imap" | "manual" | "forwarded",
+    uploaded_by: (data.uploaded_by as string | null) ?? null,
+    current_area_id: (data.current_area_id as string | null) ?? null,
+    current_area_name: areaName,
+    created_at: data.created_at as string,
+    updated_at: data.updated_at as string,
+  };
+}
+
+export async function getInboxAttachments(emailId: string): Promise<InboxAttachment[]> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("inbox_attachments")
+    .select("*")
+    .eq("email_id", emailId)
+    .order("created_at", { ascending: true });
+  return (data ?? []) as InboxAttachment[];
+}
+
+export async function getMailAuditLog(emailId: string): Promise<AuditLogEvent[]> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("audit_log")
+    .select(`
+      id, event_type, description, metadata, created_at,
+      user:profiles!audit_log_user_id_fkey(id, full_name, email),
+      area:internal_areas(id, name)
+    `)
+    .eq("inbox_email_id", emailId)
+    .order("created_at", { ascending: true });
+  return (data ?? []).map((row) => ({
+    id: row.id as number,
+    event_type: row.event_type as string,
+    description: (row.description as string) ?? null,
+    metadata: (row.metadata as Record<string, unknown>) ?? null,
+    created_at: row.created_at as string,
+    user: Array.isArray(row.user) ? row.user[0] ?? null : (row.user ?? null),
+    area: Array.isArray(row.area) ? row.area[0] ?? null : (row.area ?? null),
+  }));
+}
+
+export async function getSignedUrlForInboxAttachment(
+  storagePath: string,
+  expiresInSeconds = 600,
+): Promise<string | null> {
+  const supabase = await createClient();
+  const { data } = await supabase.storage
+    .from("inbox")
+    .createSignedUrl(storagePath, expiresInSeconds);
+  return data?.signedUrl ?? null;
+}
+
+/** Solicitudes vinculadas a un mail (via inbox_email_id en solicitudes) */
+export async function getSolicitudesVinculadasAMail(emailId: string) {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("solicitudes")
+    .select("id, numero_expediente, concepto, status")
+    .eq("inbox_email_id", emailId)
+    .order("created_at", { ascending: false });
+  return (data ?? []) as SolicitudVinculable[];
+}
+
+/** Búsqueda libre para el modal de vincular */
+export async function searchSolicitudesParaVincular(
+  query: string,
+  limit = 20,
+): Promise<SolicitudVinculable[]> {
+  const supabase = await createClient();
+  const q = query.trim();
+  let qb = supabase
+    .from("solicitudes")
+    .select("id, numero_expediente, concepto, status")
+    .neq("status", "cancelled")
+    .order("created_at", { ascending: false })
+    .limit(limit);
+  if (q) {
+    qb = qb.or(`numero_expediente.ilike.%${q}%,concepto.ilike.%${q}%`);
+  }
+  const { data } = await qb;
+  return (data ?? []) as SolicitudVinculable[];
+}
+
 export async function getGlobalSummary() {
   const supabase = await createClient();
 

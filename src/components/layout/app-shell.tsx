@@ -9,9 +9,10 @@ interface AppShellProps {
   role: Role;
   user: SidebarUser;
   isSuperAdmin: boolean;
+  canAccessInbox: boolean;
 }
 
-export function AppShell({ children, role, user, isSuperAdmin }: AppShellProps) {
+export function AppShell({ children, role, user, isSuperAdmin, canAccessInbox }: AppShellProps) {
   const [collapsed, setCollapsed] = useState(false);
 
   useEffect(() => {
@@ -34,6 +35,7 @@ export function AppShell({ children, role, user, isSuperAdmin }: AppShellProps) 
         role={role}
         user={user}
         isSuperAdmin={isSuperAdmin}
+        canAccessInbox={canAccessInbox}
       />
       <main className="flex-1 overflow-y-auto min-w-0">{children}</main>
     </div>

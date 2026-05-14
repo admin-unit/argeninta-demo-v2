@@ -26,9 +26,10 @@ interface SidebarProps {
   role: Role;
   user: SidebarUser;
   isSuperAdmin: boolean;
+  canAccessInbox: boolean;
 }
 
-export function Sidebar({ collapsed, onToggle, role, user, isSuperAdmin }: SidebarProps) {
+export function Sidebar({ collapsed, onToggle, role, user, isSuperAdmin, canAccessInbox }: SidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
   const [orgOpen, setOrgOpen] = useState(() => pathname.startsWith("/mi-organismo"));
@@ -197,6 +198,15 @@ export function Sidebar({ collapsed, onToggle, role, user, isSuperAdmin }: Sideb
               collapsed={collapsed}
               active={isActive("/facturas")}
             />
+            {canAccessInbox && (
+              <NavItem
+                href="/bandeja/mails"
+                label="Bandeja de mails"
+                icon={<MailIcon />}
+                collapsed={collapsed}
+                active={isActive("/bandeja/mails")}
+              />
+            )}
             <NavItem
               href="/bandeja-nacional"
               label="Nacional"
@@ -314,6 +324,24 @@ function SubNavItem({ href, label, active }: { href: string; label: string; acti
   );
 }
 
+function MailIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      width="15"
+      height="15"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.75"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <rect x="3" y="5" width="18" height="14" rx="2" />
+      <path d="M3 7l9 6 9-6" />
+    </svg>
+  );
+}
 function InboxIcon({ className }: { className?: string }) {
   return (
     <svg
