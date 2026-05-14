@@ -743,6 +743,27 @@ export async function getSignedUrlForInboxAttachment(
   return data?.signedUrl ?? null;
 }
 
+/**
+ * Adjuntos del inbox vinculados a una solicitud (via solicitud_inbox_attachments).
+ * Útil para mostrar PDFs del mail original cuando se convirtió a expediente.
+ */
+export async function getInboxAttachmentsForSolicitud(
+  solicitudId: string,
+): Promise<InboxAttachment[]> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("solicitud_inbox_attachments")
+    .select("inbox_attachment:inbox_attachments!inner(*)")
+    .eq("solicitud_id", solicitudId);
+  return (data ?? [])
+    .map((row) => {
+      const att = (row as { inbox_attachment: InboxAttachment | InboxAttachment[] })
+        .inbox_attachment;
+      return Array.isArray(att) ? att[0] : att;
+    })
+    .filter((a): a is InboxAttachment => Boolean(a));
+}
+
 /** Solicitudes vinculadas a un mail (via inbox_email_id en solicitudes) */
 export async function getSolicitudesVinculadasAMail(emailId: string) {
   const supabase = await createClient();

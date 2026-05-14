@@ -41,4 +41,5 @@ supabase/.env
 # claude
 .claude/projects
 .claude/cache
+.claude/worktrees
 .superpowers/

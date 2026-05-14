@@ -5,10 +5,15 @@ import {
   getAuditLogForSolicitud,
   getCurrentProfileWithContext,
   getInternalAreas,
+  getInboxAttachmentsForSolicitud,
+  getSignedUrlForInboxAttachment,
   AREAS_INTERNACIONAL,
 } from "@/lib/data";
 import { EstadoBadge } from "@/components/solicitudes/estado-badge";
 import { SolicitudDetalleArgeninta } from "@/components/solicitudes/solicitud-detalle-argeninta";
+import { AttachmentThumbsGrid } from "@/components/bandeja/attachment-thumbs";
+import { OcrAutofillButton } from "@/components/bandeja/ocr-autofill";
+import { EnviarSolicitudButton } from "@/components/solicitudes/enviar-solicitud-button";
 import { TIPO_LABEL, type EstadoSolicitud, type TipoGestion } from "@/types";
 
 export const dynamic = "force-dynamic";
@@ -36,13 +41,22 @@ export default async function SolicitudDetalle({
 }) {
   const { id } = await params;
 
-  const [solicitud, auditLog, ctx, allAreas] = await Promise.all([
+  const [solicitud, auditLog, ctx, allAreas, inboxAtts] = await Promise.all([
     getSolicitudById(id),
     getAuditLogForSolicitud(id),
     getCurrentProfileWithContext(),
     getInternalAreas(),
+    getInboxAttachmentsForSolicitud(id),
   ]);
   if (!solicitud) notFound();
+
+  const inboxAttUrlEntries = await Promise.all(
+    inboxAtts.map(async (a) => {
+      const url = await getSignedUrlForInboxAttachment(a.storage_path);
+      return [a.id, url ?? ""] as const;
+    }),
+  );
+  const inboxAttUrls = Object.fromEntries(inboxAttUrlEntries);
 
   const isArgeninta =
     ctx.profile?.user_type === "interno" || ctx.profile?.is_super_admin === true;
@@ -124,6 +138,36 @@ export default async function SolicitudDetalle({
           {solicitud.concepto ?? "(sin concepto)"}
         </h1>
       </div>
+
+      {/* CTA enviar — solo si está en draft */}
+      {isArgeninta && solicitud.status === "draft" && (
+        <EnviarSolicitudButton solicitudId={id} />
+      )}
+
+      {/* Adjuntos del mail original (cuando vino convertido desde bandeja) */}
+      {inboxAtts.length > 0 && (
+        <div className="mb-6 bg-card rounded-xl border border-border overflow-hidden">
+          <div className="px-5 py-3.5 border-b border-border/60 bg-muted/20 flex items-center justify-between gap-3">
+            <h2 className="text-[13px] font-semibold text-foreground">
+              Adjuntos del mail original
+            </h2>
+            <div className="flex items-center gap-3">
+              <OcrAutofillButton solicitudId={id} />
+              {inboxAtts[0]?.email_id && (
+                <Link
+                  href={`/bandeja/mails/${inboxAtts[0].email_id}`}
+                  className="text-[11.5px] text-primary hover:underline"
+                >
+                  ↗ Ver mail
+                </Link>
+              )}
+            </div>
+          </div>
+          <div className="p-5">
+            <AttachmentThumbsGrid attachments={inboxAtts} urls={inboxAttUrls} />
+          </div>
+        </div>
+      )}
 
       {/* Vista para externos (solicitante) — simplificada */}
       {!isArgeninta && (

@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { AREA_IDS } from "@/lib/data";
+import type { CamposFactura } from "@/lib/ocr/claude-extract";
 
 type Result = { ok: true } | { ok: false; error: string };
 
@@ -348,4 +349,123 @@ export async function syncInboxNow(): Promise<
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : String(err) };
   }
+}
+
+/**
+ * Extrae campos de factura usando Claude API (visión nativa sobre PDF).
+ * Reemplaza el flujo doctr+regex para producción. Sobre múltiples PDFs
+ * adjuntos toma el primero — el caso común es factura única por mail.
+ */
+export async function extraerCamposConClaude(solicitudId: string): Promise<
+  | {
+      ok: true;
+      campos: CamposFactura;
+      rawText: string;
+      pages: number;
+      elapsed: number;
+    }
+  | { ok: false; error: string }
+> {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: "No autenticado." };
+
+  const { data: links } = await supabase
+    .from("solicitud_inbox_attachments")
+    .select("inbox_attachment_id, inbox_attachments!inner(storage_path, filename, mime_type)")
+    .eq("solicitud_id", solicitudId);
+  if (!links || links.length === 0) {
+    return { ok: false, error: "Esta solicitud no tiene adjuntos del mail vinculados." };
+  }
+
+  const { createAdminClient } = await import("@/lib/supabase/admin");
+  const admin = createAdminClient();
+
+  type AttRow = { storage_path: string; filename: string; mime_type: string | null };
+  let firstPdf: { bytes: Uint8Array; filename: string } | null = null;
+  for (const link of links) {
+    const attRaw = (link as unknown as { inbox_attachments: AttRow | AttRow[] }).inbox_attachments;
+    const att = Array.isArray(attRaw) ? attRaw[0] : attRaw;
+    if (!att) continue;
+    if (att.mime_type && !att.mime_type.includes("pdf")) continue;
+    const { data: blob } = await admin.storage.from("inbox").download(att.storage_path);
+    if (!blob) continue;
+    firstPdf = {
+      bytes: new Uint8Array(await blob.arrayBuffer()),
+      filename: att.filename,
+    };
+    break;
+  }
+  if (!firstPdf) {
+    return { ok: false, error: "No se encontró un PDF en los adjuntos." };
+  }
+
+  try {
+    const { extractFacturaWithClaude } = await import("@/lib/ocr/claude-extract");
+    const result = await extractFacturaWithClaude(firstPdf.bytes, firstPdf.filename);
+    return {
+      ok: true,
+      campos: result.campos,
+      rawText: `[Extraído con ${result.model} — ${result.inputTokens} in / ${result.outputTokens} out tokens, ${result.elapsedSeconds}s]`,
+      pages: 1,
+      elapsed: result.elapsedSeconds,
+    };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) };
+  }
+}
+
+/**
+ * Aplica los campos revisados por el usuario a la solicitud.
+ * Updatea columnas top-level (concepto, importe, moneda, fecha_factura)
+ * y mergea el resto en `data` jsonb.
+ */
+export async function aplicarCamposExtraidos(
+  solicitudId: string,
+  campos: CamposFactura,
+): Promise<Result> {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: "No autenticado." };
+
+  const { data: sol } = await supabase
+    .from("solicitudes")
+    .select("id, data, concepto, importe, moneda")
+    .eq("id", solicitudId)
+    .maybeSingle();
+  if (!sol) return { ok: false, error: "Solicitud no encontrada." };
+
+  const existing = (sol.data ?? {}) as Record<string, unknown>;
+  const merged: Record<string, unknown> = {
+    ...existing,
+    ocr_tipo_comprobante: campos.tipo_comprobante,
+    ocr_cuit_emisor: campos.cuit_emisor,
+    ocr_razon_social: campos.razon_social_emisor,
+    ocr_punto_venta: campos.punto_venta,
+    ocr_numero_comprobante: campos.numero_comprobante,
+    ocr_fecha_emision: campos.fecha_emision,
+    ocr_aplicado_at: new Date().toISOString(),
+  };
+
+  const patch: Record<string, unknown> = { data: merged };
+  if (campos.concepto && campos.concepto.trim()) patch.concepto = campos.concepto.trim();
+  if (campos.importe_total != null) patch.importe = campos.importe_total;
+  if (campos.moneda) patch.moneda = campos.moneda;
+
+  const { error: upErr } = await supabase
+    .from("solicitudes")
+    .update(patch)
+    .eq("id", solicitudId);
+  if (upErr) return { ok: false, error: upErr.message };
+
+  await supabase.from("audit_log").insert({
+    user_id: user.id,
+    solicitud_id: solicitudId,
+    event_type: "ocr_fields_applied",
+    description: "Campos autocompletados con OCR aplicados",
+    metadata: { campos: campos as unknown as Record<string, unknown> },
+  });
+
+  revalidatePath(`/solicitudes/${solicitudId}`);
+  return { ok: true };
 }
