@@ -39,3 +39,21 @@ Apagar: Ctrl+C. Cleanup forzado: `pkill -f 'next dev'`.
 - Modelo default: `claude-haiku-4-5` (~$0.004/factura). Override con `ANTHROPIC_MODEL=claude-sonnet-4-6` en `.env.local`.
 - Auth: el código detecta si la key arranca con `sk-ant-oat` (OAuth token de Boop/Claude Code subscription) y usa `authToken` en vez de `apiKey`. Para producción en Vercel mejor usar API key real (`sk-ant-api03-...`) — los OAuth tokens rotan.
 - **UX rule:** nunca aplicar resultado de IA sin modal de revisión editable + confirmación explícita del usuario (`ReviewModal` cumple esto hoy).
+
+
+<!-- end-session 2026-05-14 -->
+## Sidebar y vistas
+- Sidebar: accesos directos editables (mostrar/ocultar + reordenar), prefs en localStorage `sidebar-shortcuts-v1`.
+- `/bandeja-nacional` soporta `?vista=kanban` (5 columnas de `ESTADO_GROUPS`).
+- `/organismos` tiene switcher Tabla/Kanban + preview popover (sistema View Settings estilo Attio).
+
+
+<!-- end-session 2026-05-14 -->
+## Deploy actual
+- URL prod: https://argeninta-demo-v2.vercel.app (alias: www.unitdev.tech)
+- Proyecto Vercel: `argeninta-demo-v2` (team `admin-units-projects`)
+- Env var `ANTHROPIC_API_KEY` configurada en Production + Preview
+- Deploy directo: `vercel --prod` desde la branch (sin esperar merge a main)
+
+## Quirk Anthropic output_config
+Para campos opcionales en `output_config.json_schema`, usar `anyOf: [{type: 'string', enum: [...]}, {type: 'null'}]`. El patrón `type: ['string', 'null']` con enum incluyendo null es rechazado por el validador.

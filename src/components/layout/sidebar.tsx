@@ -11,7 +11,6 @@ type ShortcutKey =
   | "organismos"
   | "convenios"
   | "facturas"
-  | "bandeja-mails"
   | "nacional"
   | "internacional";
 
@@ -22,12 +21,6 @@ const SHORTCUT_DEFS: Record<
   organismos: { href: "/organismos", label: "Organismos", icon: <BuildingIcon /> },
   convenios: { href: "/convenios", label: "Convenios", icon: <FileTextIcon /> },
   facturas: { href: "/facturas", label: "Facturas", icon: <ReceiptIcon /> },
-  "bandeja-mails": {
-    href: "/bandeja/mails",
-    label: "Bandeja de mails",
-    icon: <MailIcon />,
-    requiresInbox: true,
-  },
   nacional: { href: "/bandeja-nacional", label: "Nacional", icon: <DocIcon /> },
   internacional: { href: "/bandeja-internacional", label: "Internacional", icon: <GlobeIcon /> },
 };
@@ -36,7 +29,6 @@ const DEFAULT_ORDER: ShortcutKey[] = [
   "organismos",
   "convenios",
   "facturas",
-  "bandeja-mails",
   "nacional",
   "internacional",
 ];
@@ -281,6 +273,15 @@ export function Sidebar({ collapsed, onToggle, role, user, isSuperAdmin, canAcce
               collapsed={collapsed}
               active={isActive("/dashboard")}
             />
+            {canAccessInbox && (
+              <NavItem
+                href="/bandeja/mails"
+                label="Bandeja de mails"
+                icon={<MailIcon />}
+                collapsed={collapsed}
+                active={isActive("/bandeja/mails")}
+              />
+            )}
 
             {!collapsed && (
               <div className="flex items-center justify-between px-2.5 pt-3 pb-1">
