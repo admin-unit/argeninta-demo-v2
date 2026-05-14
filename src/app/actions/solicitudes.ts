@@ -14,6 +14,11 @@ type Transition = {
 };
 
 const TRANSITIONS: Partial<Record<EstadoSolicitud, Transition>> = {
+  draft: {
+    next: "submitted",
+    description: "Solicitud enviada para revisión",
+    routeToArea: AREA_IDS.MESA_ENTRADA,
+  },
   submitted: {
     next: "in_review",
     description: "Solicitud tomada en revisión",

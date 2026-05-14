@@ -2,10 +2,76 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { cn } from "@/lib/utils";
 import { signOut } from "@/app/actions/auth";
 import type { Role } from "@/types";
+
+type ShortcutKey =
+  | "organismos"
+  | "convenios"
+  | "facturas"
+  | "bandeja-mails"
+  | "nacional"
+  | "internacional";
+
+const SHORTCUT_DEFS: Record<
+  ShortcutKey,
+  { href: string; label: string; icon: React.ReactNode; requiresInbox?: boolean }
+> = {
+  organismos: { href: "/organismos", label: "Organismos", icon: <BuildingIcon /> },
+  convenios: { href: "/convenios", label: "Convenios", icon: <FileTextIcon /> },
+  facturas: { href: "/facturas", label: "Facturas", icon: <ReceiptIcon /> },
+  "bandeja-mails": {
+    href: "/bandeja/mails",
+    label: "Bandeja de mails",
+    icon: <MailIcon />,
+    requiresInbox: true,
+  },
+  nacional: { href: "/bandeja-nacional", label: "Nacional", icon: <DocIcon /> },
+  internacional: { href: "/bandeja-internacional", label: "Internacional", icon: <GlobeIcon /> },
+};
+
+const DEFAULT_ORDER: ShortcutKey[] = [
+  "organismos",
+  "convenios",
+  "facturas",
+  "bandeja-mails",
+  "nacional",
+  "internacional",
+];
+
+const PREFS_KEY = "sidebar-shortcuts-v1";
+
+interface SidebarShortcutPrefs {
+  visible: ShortcutKey[];
+  hidden: ShortcutKey[];
+}
+
+function loadPrefs(): SidebarShortcutPrefs {
+  if (typeof window === "undefined") {
+    return { visible: DEFAULT_ORDER, hidden: [] };
+  }
+  try {
+    const raw = localStorage.getItem(PREFS_KEY);
+    if (!raw) return { visible: DEFAULT_ORDER, hidden: [] };
+    const parsed = JSON.parse(raw) as Partial<SidebarShortcutPrefs>;
+    const allKeys = Object.keys(SHORTCUT_DEFS) as ShortcutKey[];
+    const visible = (parsed.visible ?? []).filter((k): k is ShortcutKey => allKeys.includes(k));
+    const hidden = (parsed.hidden ?? []).filter((k): k is ShortcutKey => allKeys.includes(k));
+    const seen = new Set([...visible, ...hidden]);
+    for (const k of DEFAULT_ORDER) if (!seen.has(k)) visible.push(k);
+    return { visible, hidden };
+  } catch {
+    return { visible: DEFAULT_ORDER, hidden: [] };
+  }
+}
+
+function savePrefs(prefs: SidebarShortcutPrefs) {
+  try {
+    localStorage.setItem(PREFS_KEY, JSON.stringify(prefs));
+  } catch {}
+}
 
 export interface SidebarUser {
   /** Nombre real desde profiles.full_name (fallback: email) */
@@ -34,6 +100,44 @@ export function Sidebar({ collapsed, onToggle, role, user, isSuperAdmin, canAcce
   const router = useRouter();
   const [orgOpen, setOrgOpen] = useState(() => pathname.startsWith("/mi-organismo"));
   const [, startTransition] = useTransition();
+  const [prefs, setPrefs] = useState<SidebarShortcutPrefs>({ visible: DEFAULT_ORDER, hidden: [] });
+  const [editMode, setEditMode] = useState(false);
+
+  useEffect(() => {
+    setPrefs(loadPrefs());
+  }, []);
+
+  function updatePrefs(next: SidebarShortcutPrefs) {
+    setPrefs(next);
+    savePrefs(next);
+  }
+
+  function toggleVisible(key: ShortcutKey) {
+    if (prefs.visible.includes(key)) {
+      updatePrefs({
+        visible: prefs.visible.filter((k) => k !== key),
+        hidden: [...prefs.hidden, key],
+      });
+    } else {
+      updatePrefs({
+        visible: [...prefs.visible, key],
+        hidden: prefs.hidden.filter((k) => k !== key),
+      });
+    }
+  }
+
+  function moveVisible(key: ShortcutKey, dir: -1 | 1) {
+    const idx = prefs.visible.indexOf(key);
+    const target = idx + dir;
+    if (idx === -1 || target < 0 || target >= prefs.visible.length) return;
+    const next = [...prefs.visible];
+    [next[idx], next[target]] = [next[target], next[idx]];
+    updatePrefs({ visible: next, hidden: prefs.hidden });
+  }
+
+  function resetPrefs() {
+    updatePrefs({ visible: DEFAULT_ORDER, hidden: [] });
+  }
 
   function handleSignOut() {
     startTransition(async () => {
@@ -177,50 +281,75 @@ export function Sidebar({ collapsed, onToggle, role, user, isSuperAdmin, canAcce
               collapsed={collapsed}
               active={isActive("/dashboard")}
             />
-            <NavItem
-              href="/organismos"
-              label="Organismos"
-              icon={<BuildingIcon />}
-              collapsed={collapsed}
-              active={isActive("/organismos")}
-            />
-            <NavItem
-              href="/convenios"
-              label="Convenios"
-              icon={<FileTextIcon />}
-              collapsed={collapsed}
-              active={isActive("/convenios")}
-            />
-            <NavItem
-              href="/facturas"
-              label="Facturas"
-              icon={<ReceiptIcon />}
-              collapsed={collapsed}
-              active={isActive("/facturas")}
-            />
-            {canAccessInbox && (
-              <NavItem
-                href="/bandeja/mails"
-                label="Bandeja de mails"
-                icon={<MailIcon />}
-                collapsed={collapsed}
-                active={isActive("/bandeja/mails")}
-              />
+
+            {!collapsed && (
+              <div className="flex items-center justify-between px-2.5 pt-3 pb-1">
+                <span className="text-[10px] font-semibold uppercase tracking-wider text-sidebar-foreground/40">
+                  Accesos directos
+                </span>
+                <button
+                  onClick={() => setEditMode((v) => !v)}
+                  className="text-[10px] font-medium text-sidebar-foreground/50 hover:text-sidebar-accent-foreground transition-colors"
+                  title={editMode ? "Listo" : "Editar"}
+                >
+                  {editMode ? "Listo" : "Editar"}
+                </button>
+              </div>
             )}
-            <NavItem
-              href="/bandeja-nacional"
-              label="Nacional"
-              icon={<DocIcon />}
-              collapsed={collapsed}
-              active={isActive("/bandeja-nacional")}
-            />
-            <NavItem
-              href="/bandeja-internacional"
-              label="Internacional"
-              icon={<GlobeIcon />}
-              collapsed={collapsed}
-              active={isActive("/bandeja-internacional")}
-            />
+
+            {editMode && !collapsed
+              ? (Object.keys(SHORTCUT_DEFS) as ShortcutKey[])
+                  .filter((k) => !SHORTCUT_DEFS[k].requiresInbox || canAccessInbox)
+                  .sort((a, b) => {
+                    const ia = prefs.visible.indexOf(a);
+                    const ib = prefs.visible.indexOf(b);
+                    if (ia !== -1 && ib !== -1) return ia - ib;
+                    if (ia !== -1) return -1;
+                    if (ib !== -1) return 1;
+                    return 0;
+                  })
+                  .map((key) => {
+                    const def = SHORTCUT_DEFS[key];
+                    const visible = prefs.visible.includes(key);
+                    const idx = prefs.visible.indexOf(key);
+                    return (
+                      <EditRow
+                        key={key}
+                        label={def.label}
+                        icon={def.icon}
+                        visible={visible}
+                        canMoveUp={visible && idx > 0}
+                        canMoveDown={visible && idx < prefs.visible.length - 1}
+                        onToggle={() => toggleVisible(key)}
+                        onMoveUp={() => moveVisible(key, -1)}
+                        onMoveDown={() => moveVisible(key, 1)}
+                      />
+                    );
+                  })
+              : prefs.visible
+                  .filter((k) => !SHORTCUT_DEFS[k].requiresInbox || canAccessInbox)
+                  .map((key) => {
+                    const def = SHORTCUT_DEFS[key];
+                    return (
+                      <NavItem
+                        key={key}
+                        href={def.href}
+                        label={def.label}
+                        icon={def.icon}
+                        collapsed={collapsed}
+                        active={isActive(def.href)}
+                      />
+                    );
+                  })}
+
+            {editMode && !collapsed && (
+              <button
+                onClick={resetPrefs}
+                className="w-full mt-2 px-2.5 py-1.5 text-[11px] font-medium text-sidebar-foreground/50 hover:text-sidebar-accent-foreground transition-colors text-left"
+              >
+                Restablecer
+              </button>
+            )}
           </>
         )}
       </nav>
@@ -274,6 +403,114 @@ export function Sidebar({ collapsed, onToggle, role, user, isSuperAdmin, canAcce
         )}
       </div>
     </aside>
+  );
+}
+
+function EditRow({
+  label,
+  icon,
+  visible,
+  canMoveUp,
+  canMoveDown,
+  onToggle,
+  onMoveUp,
+  onMoveDown,
+}: {
+  label: string;
+  icon: React.ReactNode;
+  visible: boolean;
+  canMoveUp: boolean;
+  canMoveDown: boolean;
+  onToggle: () => void;
+  onMoveUp: () => void;
+  onMoveDown: () => void;
+}) {
+  return (
+    <div
+      className={cn(
+        "flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-[13px] font-medium text-sidebar-accent-foreground"
+      )}
+    >
+      <button
+        onClick={onToggle}
+        className={cn(
+          "shrink-0 w-4 h-4 rounded border flex items-center justify-center transition-colors",
+          visible
+            ? "bg-primary border-primary text-primary-foreground hover:opacity-90"
+            : "bg-sidebar border-dashed border-sidebar-foreground/40 hover:border-sidebar-foreground/70"
+        )}
+        title={visible ? "Ocultar" : "Mostrar"}
+      >
+        {visible && (
+          <svg
+            width="10"
+            height="10"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="3"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <polyline points="20 6 9 17 4 12" />
+          </svg>
+        )}
+      </button>
+      <span className={cn("shrink-0 w-[15px] h-[15px]", !visible && "opacity-50")}>{icon}</span>
+      <span className={cn("flex-1 truncate", !visible && "text-sidebar-foreground/70")}>
+        {label}
+      </span>
+      <button
+        onClick={onMoveUp}
+        disabled={!canMoveUp}
+        className="shrink-0 w-5 h-5 flex items-center justify-center rounded text-sidebar-foreground/50 hover:text-sidebar-accent-foreground hover:bg-sidebar-accent/60 transition-colors disabled:opacity-20 disabled:hover:bg-transparent disabled:cursor-not-allowed"
+        title="Subir"
+      >
+        <ArrowUpIcon size={11} />
+      </button>
+      <button
+        onClick={onMoveDown}
+        disabled={!canMoveDown}
+        className="shrink-0 w-5 h-5 flex items-center justify-center rounded text-sidebar-foreground/50 hover:text-sidebar-accent-foreground hover:bg-sidebar-accent/60 transition-colors disabled:opacity-20 disabled:hover:bg-transparent disabled:cursor-not-allowed"
+        title="Bajar"
+      >
+        <ArrowDownIcon size={11} />
+      </button>
+    </div>
+  );
+}
+
+function ArrowUpIcon({ size = 12 }: { size?: number }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <polyline points="18 15 12 9 6 15" />
+    </svg>
+  );
+}
+
+function ArrowDownIcon({ size = 12 }: { size?: number }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <polyline points="6 9 12 15 18 9" />
+    </svg>
   );
 }
 

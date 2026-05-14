@@ -4,7 +4,7 @@ import {
   AREAS_NACIONAL,
 } from "@/lib/data";
 import { EstadoBadge } from "@/components/solicitudes/estado-badge";
-import { ESTADO_GROUPS, ESTADO_LABEL, TIPO_LABEL, type EstadoSolicitud, type TipoGestion } from "@/types";
+import { ESTADO_GROUPS, TIPO_LABEL, type EstadoSolicitud, type TipoGestion, type Solicitud } from "@/types";
 import { cn } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
@@ -16,6 +16,14 @@ const FILTROS = [
   { key: "cerradas", label: "Cerradas", statuses: ESTADO_GROUPS.cerradas },
   { key: "borradores", label: "Borradores", statuses: ESTADO_GROUPS.borradores },
 ] as const;
+
+const KANBAN_COLUMNS: { key: string; label: string; statuses: EstadoSolicitud[]; tone: string }[] = [
+  { key: "borradores", label: "Borradores", statuses: ESTADO_GROUPS.borradores, tone: "bg-gray-100 text-gray-700" },
+  { key: "pendientes", label: "Pendientes", statuses: ESTADO_GROUPS.pendientes, tone: "bg-amber-50 text-amber-700" },
+  { key: "en_proceso", label: "En proceso", statuses: ESTADO_GROUPS.en_proceso, tone: "bg-blue-50 text-blue-700" },
+  { key: "cerradas", label: "Cerradas", statuses: ESTADO_GROUPS.cerradas, tone: "bg-green-50 text-green-700" },
+  { key: "problemas", label: "Problemas", statuses: ESTADO_GROUPS.problemas, tone: "bg-rose-50 text-rose-700" },
+];
 
 function formatImporte(importe: number | null, moneda: string | null) {
   if (importe == null) return "—";
@@ -34,9 +42,19 @@ function formatFecha(fecha: string) {
 export default async function BandejaNacional({
   searchParams,
 }: {
-  searchParams: Promise<{ estado?: string; q?: string }>;
+  searchParams: Promise<{ estado?: string; q?: string; vista?: string }>;
 }) {
-  const { estado = "todos", q = "" } = await searchParams;
+  const { estado = "todos", q = "", vista = "tabla" } = await searchParams;
+  const isKanban = vista === "kanban";
+  const qs = (overrides: Record<string, string | undefined>) => {
+    const params = new URLSearchParams();
+    const base = { estado, q, vista };
+    for (const [k, v] of Object.entries({ ...base, ...overrides })) {
+      if (v && v !== "todos" && !(k === "vista" && v === "tabla")) params.set(k, v);
+    }
+    const s = params.toString();
+    return s ? `?${s}` : "";
+  };
 
   // Todas las solicitudes de las áreas "nacionales" (Mesa, Admin, Tesorería, Compras)
   const todas = await getSolicitudes({ current_area_ids: AREAS_NACIONAL, limit: 500 });
@@ -127,7 +145,7 @@ export default async function BandejaNacional({
         {FILTROS.map((f) => (
           <Link
             key={f.key}
-            href={`/bandeja-nacional?estado=${f.key}${q ? `&q=${q}` : ""}`}
+            href={`/bandeja-nacional${qs({ estado: f.key })}`}
             className={cn(
               "inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-sm font-medium transition-all",
               estado === f.key
@@ -151,9 +169,43 @@ export default async function BandejaNacional({
           </Link>
         ))}
 
-        <div className="ml-auto">
+        <div className="ml-auto flex items-center gap-3">
+          <div className="inline-flex rounded-lg border border-border bg-card p-0.5">
+            <Link
+              href={`/bandeja-nacional${qs({ vista: "tabla" })}`}
+              className={cn(
+                "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[12.5px] font-medium transition-colors",
+                !isKanban
+                  ? "bg-primary text-primary-foreground"
+                  : "text-muted-foreground hover:text-foreground"
+              )}
+              title="Vista tabla"
+            >
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+              </svg>
+              Tabla
+            </Link>
+            <Link
+              href={`/bandeja-nacional${qs({ vista: "kanban" })}`}
+              className={cn(
+                "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[12.5px] font-medium transition-colors",
+                isKanban
+                  ? "bg-primary text-primary-foreground"
+                  : "text-muted-foreground hover:text-foreground"
+              )}
+              title="Vista kanban"
+            >
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 5h4v14H4zM10 5h4v9h-4zM16 5h4v6h-4z" />
+              </svg>
+              Kanban
+            </Link>
+          </div>
+
           <form method="GET" action="/bandeja-nacional" className="relative">
             {estado !== "todos" && <input type="hidden" name="estado" value={estado} />}
+            {isKanban && <input type="hidden" name="vista" value="kanban" />}
             <svg
               className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground/50 pointer-events-none"
               fill="none"
@@ -178,7 +230,10 @@ export default async function BandejaNacional({
         </div>
       </div>
 
-      {/* Tabla */}
+      {/* Tabla o Kanban */}
+      {isKanban ? (
+        <KanbanBoard solicitudes={solicitudes} />
+      ) : (
       <div className="bg-card rounded-xl border border-border overflow-hidden">
         {solicitudes.length === 0 ? (
           <div className="py-20 text-center">
@@ -270,6 +325,7 @@ export default async function BandejaNacional({
           </table>
         )}
       </div>
+      )}
 
       <p className="mt-3 text-[12.5px] text-muted-foreground">
         {solicitudes.length} solicitud{solicitudes.length !== 1 ? "es" : ""}
@@ -277,5 +333,82 @@ export default async function BandejaNacional({
         {q && ` · búsqueda "${q}"`}
       </p>
     </div>
+  );
+}
+
+function KanbanBoard({ solicitudes }: { solicitudes: Solicitud[] }) {
+  const byColumn = new Map<string, Solicitud[]>();
+  for (const col of KANBAN_COLUMNS) byColumn.set(col.key, []);
+  for (const s of solicitudes) {
+    const col = KANBAN_COLUMNS.find((c) => c.statuses.includes(s.status));
+    if (col) byColumn.get(col.key)!.push(s);
+  }
+
+  return (
+    <div className="flex gap-3 overflow-x-auto pb-4 -mx-1 px-1">
+      {KANBAN_COLUMNS.map((col) => {
+        const items = byColumn.get(col.key) ?? [];
+        return (
+          <div
+            key={col.key}
+            className="shrink-0 w-[280px] bg-muted/30 rounded-xl border border-border/60 flex flex-col max-h-[calc(100vh-280px)]"
+          >
+            <div className="flex items-center justify-between px-3 py-2.5 border-b border-border/60">
+              <div className="flex items-center gap-2">
+                <span className={cn("inline-block w-2 h-2 rounded-full", col.tone.split(" ")[0])} />
+                <span className="text-[12px] font-semibold text-foreground uppercase tracking-wider">
+                  {col.label}
+                </span>
+              </div>
+              <span className="text-[11px] font-semibold text-muted-foreground tabular-nums px-1.5 py-0.5 rounded bg-card border border-border/60">
+                {items.length}
+              </span>
+            </div>
+            <div className="flex-1 overflow-y-auto p-2 space-y-2">
+              {items.length === 0 ? (
+                <p className="text-[11.5px] text-muted-foreground/60 text-center py-6">
+                  Sin solicitudes
+                </p>
+              ) : (
+                items.map((s) => <KanbanCard key={s.id} solicitud={s} />)
+              )}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function KanbanCard({ solicitud: s }: { solicitud: Solicitud }) {
+  return (
+    <Link
+      href={`/solicitudes/${s.id}`}
+      className="block bg-card rounded-lg border border-border/70 p-2.5 hover:border-primary/40 hover:shadow-sm transition-all"
+    >
+      <div className="flex items-start justify-between gap-2 mb-1.5">
+        <span className="font-mono text-[11px] font-semibold text-muted-foreground">
+          {s.numero_expediente ?? "(sin nro)"}
+        </span>
+        <EstadoBadge estado={s.status as EstadoSolicitud} />
+      </div>
+      <p className="text-[13px] font-medium text-foreground leading-snug line-clamp-2 mb-2">
+        {s.concepto ?? "(sin concepto)"}
+      </p>
+      <div className="flex items-center justify-between text-[11.5px]">
+        <span className="inline-flex items-center px-1.5 py-0.5 rounded bg-muted text-muted-foreground border border-border/60 font-medium truncate max-w-[140px]">
+          {s.organism_short_name ?? "—"}
+        </span>
+        <span className="font-semibold text-foreground tabular-nums">
+          {formatImporte(Number(s.importe), s.moneda)}
+        </span>
+      </div>
+      {s.tipo_slug && (
+        <p className="text-[11px] text-muted-foreground mt-1.5 truncate">
+          {TIPO_LABEL[s.tipo_slug as TipoGestion]}
+          {s.current_area_name && ` · ${s.current_area_name}`}
+        </p>
+      )}
+    </Link>
   );
 }

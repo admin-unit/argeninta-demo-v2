@@ -16,6 +16,7 @@
     "postinstall": "node -e \"try{require('fs').copyFileSync('node_modules/pdfjs-dist/build/pdf.worker.min.mjs','public/pdf.worker.min.mjs')}catch(e){}\""
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.96.0",
     "@base-ui/react": "^1.4.1",
     "@supabase/ssr": "^0.10.3",
     "@supabase/supabase-js": "^2.105.4",
@@ -26,7 +27,7 @@
     "lucide-react": "^1.14.0",
     "mailparser": "^3.9.8",
     "next": "16.2.6",
-    "pdfjs-dist": "^5.7.284",
+    "pdfjs-dist": "5.4.296",
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "react-pdf": "^10.4.1",
