@@ -612,6 +612,47 @@ export type Database = {
         }
         Relationships: []
       }
+      object_views: {
+        Row: {
+          config: Json
+          created_at: string
+          id: string
+          is_default: boolean
+          name: string
+          object_slug: string
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          config: Json
+          created_at?: string
+          id?: string
+          is_default?: boolean
+          name: string
+          object_slug: string
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          config?: Json
+          created_at?: string
+          id?: string
+          is_default?: boolean
+          name?: string
+          object_slug?: string
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "object_views_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
       profiles: {
         Row: {
           active: boolean
