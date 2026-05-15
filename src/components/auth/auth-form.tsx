@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
-import { signInAsDemo } from "@/app/actions/auth";
+import { signInAsDemo, signInWithEmailPassword } from "@/app/actions/auth";
 
 interface AuthFormProps {
   mode: "login" | "register";
@@ -12,13 +12,29 @@ interface AuthFormProps {
 export function AuthForm({ mode }: AuthFormProps) {
   const router = useRouter();
   const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
   const isEmailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+  const canSubmit = isEmailValid && password.length > 0 && !isPending;
   const label = mode === "login" ? "Iniciar sesión" : "Crear cuenta";
 
   function handleSubmit() {
+    if (!canSubmit) return;
+    setError(null);
+    startTransition(async () => {
+      try {
+        await signInWithEmailPassword(email, password);
+        router.replace("/dashboard");
+        router.refresh();
+      } catch (e) {
+        setError((e as Error).message);
+      }
+    });
+  }
+
+  function handleDemoSubmit() {
     if (!isEmailValid || isPending) return;
     setError(null);
     startTransition(async () => {
@@ -49,7 +65,7 @@ export function AuthForm({ mode }: AuthFormProps) {
           {label}
         </h1>
         <p className="text-[13px] text-muted-foreground mt-1.5">
-          Demo — ingresá con tu email
+          Ingresá con tu email y contraseña
         </p>
       </div>
 
@@ -68,12 +84,24 @@ export function AuthForm({ mode }: AuthFormProps) {
             className="w-full h-10 px-3.5 rounded-lg border border-border bg-card text-[13.5px] text-foreground placeholder:text-muted-foreground outline-none focus:border-primary/60 focus:ring-2 focus:ring-primary/10 transition-all duration-150 shadow-[0_1px_2px_rgba(0,0,0,0.04)]"
           />
 
+          <input
+            type="password"
+            value={password}
+            onChange={(e) => {
+              setPassword(e.target.value);
+              setError(null);
+            }}
+            onKeyDown={(e) => e.key === "Enter" && handleSubmit()}
+            placeholder="Contraseña"
+            className="w-full h-10 px-3.5 rounded-lg border border-border bg-card text-[13.5px] text-foreground placeholder:text-muted-foreground outline-none focus:border-primary/60 focus:ring-2 focus:ring-primary/10 transition-all duration-150 shadow-[0_1px_2px_rgba(0,0,0,0.04)]"
+          />
+
           <button
             onClick={handleSubmit}
-            disabled={!isEmailValid || isPending}
+            disabled={!canSubmit}
             className={cn(
               "w-full h-10 rounded-lg text-[13.5px] font-medium transition-all duration-200 flex items-center justify-center gap-2",
-              isEmailValid && !isPending
+              canSubmit
                 ? "bg-primary text-primary-foreground hover:bg-primary/90 shadow-[0_1px_2px_rgba(0,0,0,0.15)]"
                 : "bg-muted text-muted-foreground cursor-not-allowed",
             )}
@@ -93,9 +121,16 @@ export function AuthForm({ mode }: AuthFormProps) {
           <p className="text-[12.5px] text-destructive text-center">{error}</p>
         )}
 
-        <p className="text-[11.5px] text-muted-foreground text-center pt-2">
-          Modo demo · acceso sin verificación
-        </p>
+        <div className="pt-2 text-center">
+          <button
+            type="button"
+            onClick={handleDemoSubmit}
+            disabled={!isEmailValid || isPending}
+            className="text-[11.5px] text-muted-foreground hover:text-foreground underline underline-offset-2 disabled:opacity-50 disabled:no-underline disabled:cursor-not-allowed transition-colors"
+          >
+            Entrar como demo (solo con email)
+          </button>
+        </div>
       </div>
     </div>
   );

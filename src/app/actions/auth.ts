@@ -66,6 +66,26 @@ export async function signInAsDemo(email: string) {
   }
 }
 
+// Login real con email + password.
+export async function signInWithEmailPassword(email: string, password: string) {
+  const normalized = email.trim().toLowerCase();
+  if (!normalized) throw new Error("Ingresá un email");
+  if (!password) throw new Error("Ingresá una contraseña");
+
+  const supabase = await createClient();
+  const { error } = await supabase.auth.signInWithPassword({
+    email: normalized,
+    password,
+  });
+
+  if (error) {
+    if (error.message.toLowerCase().includes("invalid login")) {
+      throw new Error("Email o contraseña incorrectos.");
+    }
+    throw new Error(error.message);
+  }
+}
+
 export async function getGoogleOAuthUrl() {
   const supabase = await createClient();
   const site = await getSiteUrl();
