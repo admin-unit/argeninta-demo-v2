@@ -64,7 +64,24 @@ create policy "crear solicitudes propias" on solicitudes
   );
 
 -- =============================================================================
--- 3. POLICY organism_members — admin_org/referente gestionan su organismo
+-- 3. HELPER: organismos_donde_admin (SECURITY DEFINER para evitar recursión RLS)
+-- =============================================================================
+-- Una policy sobre organism_members que hace subquery a organism_members
+-- dispara recursión infinita. Esta función bypasea RLS por venir del owner.
+
+create or replace function organismos_donde_admin(p_user_id uuid)
+returns table(organism_id uuid)
+language sql security definer stable
+set search_path = public, auth
+as $$
+  select om.organism_id
+  from organism_members om
+  where om.user_id = p_user_id
+    and om.role in ('admin_org', 'referente');
+$$;
+
+-- =============================================================================
+-- 4. POLICY organism_members — admin_org/referente gestionan su organismo
 -- =============================================================================
 -- Hoy solo super_admin puede gestionar organism_members. Habilitamos a los
 -- referentes y admin_org del organismo. El server action usa service_role
@@ -73,24 +90,14 @@ create policy "crear solicitudes propias" on solicitudes
 create policy "admin_org gestiona miembros propios" on organism_members
   for all to authenticated
   using (
-    organism_id in (
-      select om.organism_id
-      from organism_members om
-      where om.user_id = auth.uid()
-        and om.role in ('admin_org', 'referente')
-    )
+    organism_id in (select organism_id from organismos_donde_admin(auth.uid()))
   )
   with check (
-    organism_id in (
-      select om.organism_id
-      from organism_members om
-      where om.user_id = auth.uid()
-        and om.role in ('admin_org', 'referente')
-    )
+    organism_id in (select organism_id from organismos_donde_admin(auth.uid()))
   );
 
 -- =============================================================================
--- 4. POLICY organism_convenios — admin_org/referente pueden gestionar visibilidad
+-- 5. POLICY organism_convenios — admin_org/referente pueden gestionar visibilidad
 -- =============================================================================
 -- Útil para que un admin del organismo decida qué convenios ve su organismo
 -- (display_alias, visibilidad). El sync de Odoo sigue siendo super_admin.
@@ -98,20 +105,10 @@ create policy "admin_org gestiona miembros propios" on organism_members
 create policy "admin_org gestiona convenios visibles" on organism_convenios
   for update to authenticated
   using (
-    organism_id in (
-      select om.organism_id
-      from organism_members om
-      where om.user_id = auth.uid()
-        and om.role in ('admin_org', 'referente')
-    )
+    organism_id in (select organism_id from organismos_donde_admin(auth.uid()))
   )
   with check (
-    organism_id in (
-      select om.organism_id
-      from organism_members om
-      where om.user_id = auth.uid()
-        and om.role in ('admin_org', 'referente')
-    )
+    organism_id in (select organism_id from organismos_donde_admin(auth.uid()))
   );
 
 -- =============================================================================
