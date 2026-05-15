@@ -369,3 +369,138 @@ export async function getSolicitudesForArea(
     created_at: r.created_at,
   }));
 }
+
+/**
+ * Crea una solicitud nueva desde la vista del organismo externo.
+ *
+ * Reglas:
+ * - Usuario externo: organism_id se fuerza al primary_organism del caller.
+ * - Solo se permite usar convenios visibles del organismo.
+ * - Status inicial: 'submitted' (entra directo a Mesa de Entrada).
+ */
+export async function crearSolicitudExterna(input: {
+  tipoSlug: string;
+  concepto: string;
+  importe: number;
+  moneda: string;
+  cuentaAnaliticaOdooId: number;
+  urgency?: "normal" | "urgente";
+  notes?: string;
+}): Promise<{ ok: true; solicitudId: string } | { ok: false; error: string }> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: "No estás autenticado." };
+
+  if (!input.concepto.trim()) return { ok: false, error: "El concepto es obligatorio." };
+  if (!Number.isFinite(input.importe) || input.importe <= 0)
+    return { ok: false, error: "El importe debe ser mayor a 0." };
+
+  // Primary organism del caller
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("id, user_type, is_super_admin")
+    .eq("id", user.id)
+    .maybeSingle();
+  if (!profile) return { ok: false, error: "Perfil no encontrado." };
+
+  const { data: members } = await supabase
+    .from("organism_members")
+    .select("organism_id, organisms(id, short_name)")
+    .eq("user_id", user.id)
+    .limit(1);
+  const organismId = members?.[0]?.organism_id;
+  if (!organismId)
+    return {
+      ok: false,
+      error: "Tu cuenta no está asignada a un organismo.",
+    };
+
+  // Validar que el convenio elegido pertenece al organismo
+  const { data: convenio } = await supabase
+    .from("organism_convenios")
+    .select("odoo_analytic_account_id, visible")
+    .eq("organism_id", organismId)
+    .eq("odoo_analytic_account_id", input.cuentaAnaliticaOdooId)
+    .eq("visible", true)
+    .maybeSingle();
+  if (!convenio)
+    return {
+      ok: false,
+      error: "El convenio elegido no pertenece a tu organismo.",
+    };
+
+  // Tipo de gestión
+  const { data: tipo } = await supabase
+    .from("tipos_gestion")
+    .select("id")
+    .eq("slug", input.tipoSlug)
+    .maybeSingle();
+  if (!tipo)
+    return { ok: false, error: `Tipo de gestión "${input.tipoSlug}" no encontrado.` };
+
+  // Generar número de expediente
+  const orgShort = (members?.[0]?.organisms as { short_name?: string } | null)
+    ?.short_name;
+  const year = new Date().getFullYear();
+  let numeroExpediente: string | null = null;
+  if (orgShort) {
+    const { data: nextNum } = await supabase.rpc("next_expediente_number", {
+      p_organism_short_name: orgShort,
+      p_year: year,
+    });
+    if (typeof nextNum === "number") {
+      numeroExpediente = `EXP-${year}-${orgShort.toUpperCase()}-${String(
+        nextNum
+      ).padStart(4, "0")}`;
+    }
+  }
+
+  // Insertar
+  const { data: inserted, error: insertErr } = await supabase
+    .from("solicitudes")
+    .insert({
+      numero_expediente: numeroExpediente,
+      tipo_gestion_id: tipo.id,
+      status: "submitted",
+      urgency: input.urgency ?? "normal",
+      created_by_user_id: user.id,
+      organism_id: organismId,
+      current_area_id: AREA_IDS.MESA_ENTRADA,
+      concepto: input.concepto.trim(),
+      importe: input.importe,
+      moneda: input.moneda || "ARS",
+      odoo_analytic_account_id: input.cuentaAnaliticaOdooId,
+      submitted_at: new Date().toISOString(),
+      data: {
+        notes: input.notes?.trim() || null,
+        created_via: "mi-organismo",
+      },
+    })
+    .select("id")
+    .single();
+
+  if (insertErr || !inserted)
+    return {
+      ok: false,
+      error: `No se pudo crear la solicitud: ${insertErr?.message ?? "desconocido"}`,
+    };
+
+  // Audit log
+  await supabase.from("audit_log").insert({
+    user_id: user.id,
+    solicitud_id: inserted.id,
+    area_id: AREA_IDS.MESA_ENTRADA,
+    event_type: "created",
+    description: "Solicitud creada desde Mi Organismo",
+    metadata: {
+      tipo: input.tipoSlug,
+      via: "mi-organismo",
+    },
+  });
+
+  revalidatePath("/mi-organismo/solicitudes");
+  revalidatePath("/bandeja-nacional");
+  return { ok: true, solicitudId: inserted.id };
+}

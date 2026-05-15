@@ -90,7 +90,15 @@ export async function getConveniosForOrganism(organismId: string) {
       name,
       display_alias,
       fuente_financiamiento,
-      analytic:odoo_analytic_accounts(balance, plan_name)
+      analytic:odoo_analytic_accounts(
+        balance,
+        balance_devengado,
+        balance_financiero,
+        plan_name,
+        parent_odoo_id,
+        hierarchy_path,
+        hierarchy_level
+      )
     `)
     .eq("organism_id", organismId)
     .eq("visible", true)

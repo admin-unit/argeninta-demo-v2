@@ -60,7 +60,7 @@ export default async function SolicitudesMiOrganismo() {
           </p>
         </div>
         <Link
-          href="/solicitudes/nueva?bandeja=nacional"
+          href="/mi-organismo/solicitudes/nueva"
           className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground text-sm font-medium rounded-lg hover:opacity-90 transition-opacity"
         >
           <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

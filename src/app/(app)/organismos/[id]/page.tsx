@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeftIcon, PlusIcon } from "lucide-react";
+import { ArrowLeftIcon, PlusIcon, UsersIcon } from "lucide-react";
 
 import { getOrganismRow } from "@/lib/views/data-organisms";
 import { cn } from "@/lib/utils";
@@ -61,13 +61,22 @@ export default async function OrganismDetail({
             )}
           </div>
         </div>
-        <Link
-          href={`/solicitudes/nueva?organism_id=${row.id}&organism_name=${encodeURIComponent(row.short_name ?? row.name)}&bandeja=${row.tipo === "internacional" ? "internacional" : "nacional"}`}
-          className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-primary text-primary-foreground text-[13px] font-medium rounded-lg hover:opacity-90 transition-opacity shadow-sm"
-        >
-          <PlusIcon className="w-3.5 h-3.5" />
-          Nueva solicitud
-        </Link>
+        <div className="flex items-center gap-2">
+          <Link
+            href={`/organismos/${row.id}/miembros`}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-border text-foreground text-[13px] font-medium rounded-lg hover:bg-accent transition-colors"
+          >
+            <UsersIcon className="w-3.5 h-3.5" />
+            Miembros
+          </Link>
+          <Link
+            href={`/solicitudes/nueva?organism_id=${row.id}&organism_name=${encodeURIComponent(row.short_name ?? row.name)}&bandeja=${row.tipo === "internacional" ? "internacional" : "nacional"}`}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-primary text-primary-foreground text-[13px] font-medium rounded-lg hover:opacity-90 transition-opacity shadow-sm"
+          >
+            <PlusIcon className="w-3.5 h-3.5" />
+            Nueva solicitud
+          </Link>
+        </div>
       </header>
 
       <section className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-6">
